@@ -45,6 +45,16 @@ const el = {
   loreAnalysis: document.getElementById("loreAnalysis"),
   loreTierList: document.getElementById("loreTierList"),
   totalGames: document.getElementById("totalGames"),
+  // Histogram titles/subtitles/help buttons
+  leaderHistogramTitle: document.getElementById("leaderHistogramTitle"),
+  leaderHistogramSubtitle: document.getElementById("leaderHistogramSubtitle"),
+  leaderHistogramHelp: document.getElementById("leaderHistogramHelp"),
+  loreHistogramTitle: document.getElementById("loreHistogramTitle"),
+  loreHistogramSubtitle: document.getElementById("loreHistogramSubtitle"),
+  loreHistogramHelp: document.getElementById("loreHistogramHelp"),
+  allHistogramTitle: document.getElementById("allHistogramTitle"),
+  allHistogramSubtitle: document.getElementById("allHistogramSubtitle"),
+  allHistogramHelp: document.getElementById("allHistogramHelp"),
 };
 
 // ========== State ==========
@@ -362,26 +372,94 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   });
 }
 
-function renderHistogram(cards, container, barClass = "leader") {
-  const winRates = cards.map(c => c.stats?.winRate ?? 0);
+function renderHistogram(cards, container, barClass = "leader", metric = "winRate") {
+  // Get metric configuration
+  const metricConfig = {
+    winRate: {
+      title: "Win Rate Distribution",
+      subtitle: "How spread out are the win rates?",
+      tooltip: "Histogram showing how win rates are distributed. In a 4-player game, 25% is expected average. Bars show how many cards fall into each win rate bracket.",
+      getValue: (c) => c.stats?.winRate ?? 0,
+      binSize: 5,
+      formatLabel: (val) => `${val}%`,
+      showExpectedLine: true,
+      expectedValue: 25,
+    },
+    wins: {
+      title: "Total Wins Distribution",
+      subtitle: "How are wins distributed across cards?",
+      tooltip: "Histogram showing how total wins are distributed. Bars show how many cards fall into each win count bracket.",
+      getValue: (c) => c.stats?.wins ?? 0,
+      binSize: null, // Auto-calculate
+      formatLabel: (val) => `${val}`,
+      showExpectedLine: false,
+    },
+    timesPicked: {
+      title: "Times Picked Distribution",
+      subtitle: "How popular are the cards?",
+      tooltip: "Histogram showing how often cards are picked. Bars show how many cards fall into each pick count bracket.",
+      getValue: (c) => c.stats?.timesPicked ?? 0,
+      binSize: null, // Auto-calculate
+      formatLabel: (val) => `${val}`,
+      showExpectedLine: false,
+    },
+  };
   
-  // Create bins (5% increments)
-  const binSize = 5;
-  const minBin = Math.floor(Math.min(...winRates) / binSize) * binSize;
-  const maxBin = Math.ceil(Math.max(...winRates) / binSize) * binSize;
+  const config = metricConfig[metric] || metricConfig.winRate;
+  
+  // Update titles based on section
+  if (barClass === "leader") {
+    el.leaderHistogramTitle.textContent = config.title;
+    el.leaderHistogramSubtitle.textContent = config.subtitle;
+    el.leaderHistogramHelp.dataset.tooltip = config.tooltip;
+  } else if (barClass === "lore") {
+    el.loreHistogramTitle.textContent = config.title;
+    el.loreHistogramSubtitle.textContent = config.subtitle;
+    el.loreHistogramHelp.dataset.tooltip = config.tooltip;
+  } else if (barClass === "all") {
+    el.allHistogramTitle.textContent = config.title;
+    el.allHistogramSubtitle.textContent = config.subtitle;
+    el.allHistogramHelp.dataset.tooltip = config.tooltip;
+  }
+  
+  const values = cards.map(c => config.getValue(c));
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  
+  // Auto-calculate bin size if not specified
+  let binSize = config.binSize;
+  if (!binSize) {
+    const range = maxVal - minVal;
+    // Aim for ~8-12 bins
+    binSize = Math.ceil(range / 10);
+    // Round to nice numbers
+    if (binSize > 50) binSize = Math.ceil(binSize / 50) * 50;
+    else if (binSize > 10) binSize = Math.ceil(binSize / 10) * 10;
+    else if (binSize > 5) binSize = Math.ceil(binSize / 5) * 5;
+    else binSize = Math.max(1, binSize);
+  }
+  
+  const minBin = Math.floor(minVal / binSize) * binSize;
+  const maxBin = Math.ceil(maxVal / binSize) * binSize;
   
   const bins = [];
   for (let start = minBin; start < maxBin; start += binSize) {
     const end = start + binSize;
-    const count = cards.filter(c => {
-      const wr = c.stats?.winRate ?? 0;
-      return wr >= start && wr < end;
-    }).length;
     const cardsInBin = cards.filter(c => {
-      const wr = c.stats?.winRate ?? 0;
-      return wr >= start && wr < end;
+      const val = config.getValue(c);
+      return val >= start && val < end;
     });
-    bins.push({ start, end, count, cards: cardsInBin });
+    bins.push({ start, end, count: cardsInBin.length, cards: cardsInBin });
+  }
+  
+  // Handle edge case where max value equals the last bin start
+  if (bins.length > 0) {
+    const lastBin = bins[bins.length - 1];
+    const cardsAtMax = cards.filter(c => config.getValue(c) === maxBin);
+    if (cardsAtMax.length > 0 && lastBin.end === maxBin) {
+      lastBin.cards = [...lastBin.cards, ...cardsAtMax.filter(c => !lastBin.cards.includes(c))];
+      lastBin.count = lastBin.cards.length;
+    }
   }
   
   const maxCount = Math.max(...bins.map(b => b.count), 1);
@@ -392,7 +470,7 @@ function renderHistogram(cards, container, barClass = "leader") {
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
   
-  const barWidth = chartW / bins.length - 4;
+  const barWidth = Math.max(8, chartW / bins.length - 4);
   const barGap = 4;
   
   // Create SVG
@@ -406,11 +484,13 @@ function renderHistogram(cards, container, barClass = "leader") {
   }
   svg += `</g>`;
   
-  // 25% expected line (for 4-player game)
-  const expected25 = bins.findIndex(b => b.start <= 25 && b.end > 25);
-  if (expected25 >= 0) {
-    const x25 = padding.left + (expected25 + 0.5) * (barWidth + barGap);
-    svg += `<line x1="${x25}" y1="${padding.top}" x2="${x25}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+  // Expected line (only for win rate)
+  if (config.showExpectedLine) {
+    const expectedBin = bins.findIndex(b => b.start <= config.expectedValue && b.end > config.expectedValue);
+    if (expectedBin >= 0) {
+      const xExpected = padding.left + (expectedBin + 0.5) * (barWidth + barGap);
+      svg += `<line x1="${xExpected}" y1="${padding.top}" x2="${xExpected}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+    }
   }
   
   // Bars
@@ -419,19 +499,22 @@ function renderHistogram(cards, container, barClass = "leader") {
     const barH = (bin.count / maxCount) * chartH;
     const y = padding.top + chartH - barH;
     const cardNames = bin.cards.map(c => c.name).join(", ");
+    const rangeLabel = `${config.formatLabel(bin.start)}-${config.formatLabel(bin.end)}`;
     
     svg += `<rect 
       x="${x}" y="${y}" 
       width="${barWidth}" height="${barH}" 
       class="bar ${barClass}" 
       rx="2"
-      data-range="${bin.start}-${bin.end}%"
+      data-range="${rangeLabel}"
       data-count="${bin.count}"
       data-cards="${cardNames}"
     />`;
     
-    // X-axis label
-    svg += `<text x="${x + barWidth / 2}" y="${height - 8}" text-anchor="middle" class="axis-label">${bin.start}%</text>`;
+    // X-axis label (only show some labels to avoid crowding)
+    if (bins.length <= 10 || i % 2 === 0) {
+      svg += `<text x="${x + barWidth / 2}" y="${height - 8}" text-anchor="middle" class="axis-label">${config.formatLabel(bin.start)}</text>`;
+    }
   });
   
   // Axes
@@ -599,7 +682,7 @@ function renderTierList(cards, container) {
   });
 }
 
-function renderInsights(leaders, lore) {
+function renderInsights(leaders, lore, metric = "winRate") {
   const insights = calculateInsights(leaders, lore);
   const allCards = [...leaders, ...lore];
   
@@ -608,24 +691,31 @@ function renderInsights(leaders, lore) {
   
   // Render All Cards insights
   renderScatterChart(allCards, el.allScatterChart, "all");
-  renderHistogram(allCards, el.allHistogram, "all");
+  renderHistogram(allCards, el.allHistogram, "all", metric);
   renderCardAnalysis(allCards, el.allAnalysis);
   renderTierList(allCards, el.allTierList);
   
   // Render Leader insights
   renderScatterChart(leaders, el.leaderScatterChart, "leader");
-  renderHistogram(leaders, el.leaderHistogram, "leader");
+  renderHistogram(leaders, el.leaderHistogram, "leader", metric);
   renderCardAnalysis(leaders, el.leaderAnalysis);
   renderTierList(leaders, el.leaderTierList);
   
   // Render Lore insights
   renderScatterChart(lore, el.loreScatterChart, "lore");
-  renderHistogram(lore, el.loreHistogram, "lore");
+  renderHistogram(lore, el.loreHistogram, "lore", metric);
   renderCardAnalysis(lore, el.loreAnalysis);
   renderTierList(lore, el.loreTierList);
   
   // Update footer with total games
   el.totalGames.textContent = insights.estimatedGames.toLocaleString();
+}
+
+function refreshHistograms(metric) {
+  const allCards = [...appState.leaders, ...appState.lore];
+  renderHistogram(allCards, el.allHistogram, "all", metric);
+  renderHistogram(appState.leaders, el.leaderHistogram, "leader", metric);
+  renderHistogram(appState.lore, el.loreHistogram, "lore", metric);
 }
 
 // ========== Card Rendering ==========
@@ -832,7 +922,13 @@ function wireUi(state) {
     renderCards(appState.lore, el.loreCards, metric, query);
   };
   
-  el.metric.addEventListener("change", refreshCards);
+  const onMetricChange = () => {
+    refreshCards();
+    // Also update histograms when metric changes
+    refreshHistograms(el.metric.value);
+  };
+  
+  el.metric.addEventListener("change", onMetricChange);
   el.query.addEventListener("input", refreshCards);
   
   el.tabs.forEach((tab) => {
