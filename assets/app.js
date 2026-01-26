@@ -1,0 +1,906 @@
+import yaml from "https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm";
+import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
+import { CONFIG } from "./config.js";
+
+// ========== DOM Elements ==========
+const el = {
+  status: document.getElementById("status"),
+  allCards: document.getElementById("allCards"),
+  leaderCards: document.getElementById("leaderCards"),
+  loreCards: document.getElementById("loreCards"),
+  allSection: document.getElementById("allSection"),
+  leadersSection: document.getElementById("leadersSection"),
+  loreSection: document.getElementById("loreSection"),
+  query: document.getElementById("query"),
+  metric: document.getElementById("metric"),
+  tabs: document.querySelectorAll(".tab"),
+  // Theme
+  themeToggle: document.getElementById("themeToggle"),
+  // Modal
+  modal: document.getElementById("cardModal"),
+  modalImg: document.getElementById("modalImg"),
+  modalName: document.getElementById("modalName"),
+  modalStats: document.getElementById("modalStats"),
+  modalText: document.getElementById("modalText"),
+  modalClose: document.querySelector(".modal-close"),
+  modalBackdrop: document.querySelector(".modal-backdrop"),
+  // Compare
+  compareBtn: document.getElementById("compareBtn"),
+  comparePanel: document.getElementById("comparePanel"),
+  closeCompare: document.getElementById("closeCompare"),
+  compareSlots: document.getElementById("compareSlots"),
+  // Insights - All
+  allScatterChart: document.getElementById("allScatterChart"),
+  allHistogram: document.getElementById("allHistogram"),
+  allAnalysis: document.getElementById("allAnalysis"),
+  allTierList: document.getElementById("allTierList"),
+  // Insights - Leaders
+  leaderScatterChart: document.getElementById("leaderScatterChart"),
+  leaderHistogram: document.getElementById("leaderHistogram"),
+  leaderAnalysis: document.getElementById("leaderAnalysis"),
+  leaderTierList: document.getElementById("leaderTierList"),
+  // Insights - Lore
+  loreScatterChart: document.getElementById("loreScatterChart"),
+  loreHistogram: document.getElementById("loreHistogram"),
+  loreAnalysis: document.getElementById("loreAnalysis"),
+  loreTierList: document.getElementById("loreTierList"),
+  totalGames: document.getElementById("totalGames"),
+};
+
+// ========== State ==========
+let appState = {
+  leaders: [],
+  lore: [],
+  allCards: [],
+  compareMode: false,
+  compareCards: [null, null],
+  insights: null,
+};
+
+// ========== Utilities ==========
+function setStatus(message, { isError = false } = {}) {
+  el.status.textContent = message;
+  el.status.classList.toggle("error", isError);
+}
+
+function normalizeText(value) {
+  return String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function formatCardText(text) {
+  if (!text) return "";
+  // Escape HTML first
+  let formatted = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  // Bold: **text** → <strong>text</strong>
+  formatted = formatted.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  // Italic: *text* → <em>text</em>
+  formatted = formatted.replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  return formatted;
+}
+
+function getImageUrl(card) {
+  if (!card?.image) return null;
+  return `${CONFIG.cardImagesBaseUrl}${encodeURIComponent(card.image)}.png`;
+}
+
+// ========== Theme Toggle ==========
+function initTheme() {
+  const saved = localStorage.getItem("arcs-theme");
+  if (saved) {
+    document.documentElement.dataset.theme = saved;
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.dataset.theme || "dark";
+  const next = current === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("arcs-theme", next);
+}
+
+// ========== Data Loading ==========
+async function fetchText(url) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Fetch failed ${res.status}: ${url}`);
+  const text = await res.text();
+  
+  if (text.includes("accounts.google.com") && text.includes("Sign in")) {
+    throw new Error("Google requires login. Make the sheet public.");
+  }
+  return text;
+}
+
+async function loadCards() {
+  const text = await fetchText(CONFIG.cardsYamlUrl);
+  const data = yaml.load(text);
+  if (!Array.isArray(data)) throw new Error("Invalid YAML format");
+  
+  return data
+    .filter((c) => c && typeof c === "object" && c.name)
+    .map((c) => ({
+      id: c.id ?? null,
+      name: c.name ?? "",
+      image: c.image ?? null,
+      imageClass: c.imageClass ?? "",
+      tags: Array.isArray(c.tags) ? c.tags : [],
+      text: c.text ?? "",
+    }));
+}
+
+async function loadSheet() {
+  const text = await fetchText(CONFIG.sheetCsvUrl);
+  const parsed = Papa.parse(text, { header: false, skipEmptyLines: false });
+  return parsed.data ?? [];
+}
+
+function parseLeadersLoreSheet(rows) {
+  const stats = [];
+  
+  let headerRowIdx = -1;
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    const row = rows[i];
+    if (row && normalizeText(row[0]) === "leader") {
+      headerRowIdx = i;
+      break;
+    }
+  }
+  
+  if (headerRowIdx === -1) return stats;
+  
+  const headerRow = rows[headerRowIdx];
+  let loreColIdx = -1;
+  for (let i = 0; i < headerRow.length; i++) {
+    if (normalizeText(headerRow[i]) === "lore") {
+      loreColIdx = i;
+      break;
+    }
+  }
+  
+  for (let i = headerRowIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row) continue;
+    
+    const leaderName = (row[0] ?? "").trim();
+    if (leaderName) {
+      stats.push({
+        name: leaderName,
+        type: "Leader",
+        timesPicked: parseInt(row[1], 10) || 0,
+        wins: parseInt(row[2], 10) || 0,
+        winRate: parseFloat((row[3] ?? "").replace("%", "")) || 0,
+      });
+    }
+    
+    if (loreColIdx > 0) {
+      const loreName = (row[loreColIdx] ?? "").trim();
+      if (loreName) {
+        stats.push({
+          name: loreName,
+          type: "Lore",
+          timesPicked: parseInt(row[loreColIdx + 1], 10) || 0,
+          wins: parseInt(row[loreColIdx + 2], 10) || 0,
+          winRate: parseFloat((row[loreColIdx + 3] ?? "").replace("%", "")) || 0,
+        });
+      }
+    }
+  }
+  
+  return stats;
+}
+
+function joinCardsWithStats(cards, sheetRows) {
+  const stats = parseLeadersLoreSheet(sheetRows);
+  const statsIndex = new Map(stats.map((s) => [normalizeText(s.name), s]));
+  
+  const joined = [];
+  for (const card of cards) {
+    const stat = statsIndex.get(normalizeText(card.name));
+    if (stat) {
+      joined.push({ ...card, stats: stat });
+    }
+  }
+  
+  return { cards: joined, totalStats: stats.length };
+}
+
+// ========== Data Insights ==========
+function calculateInsights(leaders, lore) {
+  const allCards = [...leaders, ...lore];
+  
+  // Calculate averages
+  const avgWinRate = allCards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / allCards.length;
+  const avgPicks = allCards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / allCards.length;
+  
+  const leaderAvgWR = leaders.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / leaders.length;
+  const loreAvgWR = lore.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / lore.length;
+  
+  // Total games (approximate from leader picks divided by players per game)
+  const totalPicks = leaders.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0);
+  const estimatedGames = Math.round(totalPicks / 4); // 4 players per game
+  
+  // Find underrated cards (high win rate, low picks)
+  const underrated = allCards
+    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
+    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  // Find overrated cards (low win rate, high picks)
+  const overrated = allCards
+    .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
+    .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  // Find meta cards (high win rate AND high picks)
+  const meta = allCards
+    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
+    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  // Most consistent (closest to 25% win rate with decent sample)
+  const minPicks = avgPicks * 0.5;
+  const consistent = allCards
+    .filter(c => c.stats?.timesPicked >= minPicks)
+    .sort((a, b) => Math.abs((a.stats?.winRate ?? 0) - 25) - Math.abs((b.stats?.winRate ?? 0) - 25))
+    .slice(0, 3);
+  
+  return {
+    avgWinRate,
+    avgPicks,
+    leaderAvgWR,
+    loreAvgWR,
+    estimatedGames,
+    underrated,
+    overrated,
+    meta,
+    consistent,
+  };
+}
+
+function getCardBadge(card, insights) {
+  const wr = card.stats?.winRate ?? 0;
+  const picks = card.stats?.timesPicked ?? 0;
+  
+  if (wr > insights.avgWinRate + 5 && picks < insights.avgPicks * 0.8) {
+    return { type: "underrated", label: "Hidden Gem 💎" };
+  }
+  if (wr < insights.avgWinRate - 5 && picks > insights.avgPicks * 1.2) {
+    return { type: "overrated", label: "Overrated 📉" };
+  }
+  if (wr > insights.avgWinRate + 3 && picks > insights.avgPicks * 1.2) {
+    return { type: "meta", label: "Meta 🔥" };
+  }
+  return null;
+}
+
+function renderScatterChart(cards, container, dotClass = "leader") {
+  const maxPicks = Math.max(...cards.map(c => c.stats?.timesPicked ?? 0));
+  const maxWR = Math.max(...cards.map(c => c.stats?.winRate ?? 0));
+  const minWR = Math.min(...cards.map(c => c.stats?.winRate ?? 0));
+  
+  const width = 280;
+  const height = 180;
+  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+  
+  // Scale functions
+  const xScale = (picks) => padding.left + (picks / maxPicks) * chartW;
+  const yScale = (wr) => padding.top + chartH - ((wr - minWR) / (maxWR - minWR)) * chartH;
+  
+  // Create SVG
+  let svg = `<svg viewBox="0 0 ${width} ${height}" class="scatter-svg">`;
+  
+  // Grid lines
+  svg += `<g class="grid">`;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartH / 4) * i;
+    svg += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="currentColor" stroke-opacity="0.1"/>`;
+  }
+  svg += `</g>`;
+  
+  // Axes
+  svg += `<line x1="${padding.left}" y1="${padding.top + chartH}" x2="${width - padding.right}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
+  svg += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
+  
+  // Axis labels
+  svg += `<text x="${width / 2}" y="${height - 5}" text-anchor="middle" class="axis-label">Times Picked</text>`;
+  svg += `<text x="12" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 12, ${height / 2})" class="axis-label">Win Rate %</text>`;
+  
+  // Average lines (dashed)
+  const avgPicks = cards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / cards.length;
+  const avgWR = cards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / cards.length;
+  svg += `<line x1="${xScale(avgPicks)}" y1="${padding.top}" x2="${xScale(avgPicks)}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+  svg += `<line x1="${padding.left}" y1="${yScale(avgWR)}" x2="${width - padding.right}" y2="${yScale(avgWR)}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+  
+  // Plot points - use card type for "all" view, otherwise use dotClass
+  cards.forEach(card => {
+    const x = xScale(card.stats?.timesPicked ?? 0);
+    const y = yScale(card.stats?.winRate ?? 0);
+    const cardType = dotClass === "all" ? (card.stats?.type === "Leader" ? "leader" : "lore") : dotClass;
+    svg += `<circle cx="${x}" cy="${y}" r="5" class="dot ${cardType}" data-name="${card.name}" data-wr="${card.stats?.winRate?.toFixed(1)}" data-picks="${card.stats?.timesPicked}" data-type="${card.stats?.type || ''}"/>`;
+  });
+  
+  svg += `</svg>`;
+  
+  // Add legend for "all" view
+  if (dotClass === "all") {
+    svg += `<div class="chart-legend"><span class="legend-item"><span class="legend-dot leader"></span>Leaders</span><span class="legend-item"><span class="legend-dot lore"></span>Lore</span></div>`;
+  }
+  
+  const tooltipId = `tooltip-${dotClass}-${Date.now()}`;
+  svg += `<div class="scatter-tooltip" id="${tooltipId}"></div>`;
+  
+  container.innerHTML = svg;
+  
+  // Add hover tooltips
+  const tooltip = document.getElementById(tooltipId);
+  container.querySelectorAll(".dot").forEach(dot => {
+    dot.addEventListener("mouseenter", (e) => {
+      const name = e.target.dataset.name;
+      const wr = e.target.dataset.wr;
+      const picks = e.target.dataset.picks;
+      tooltip.innerHTML = `<strong>${name}</strong><br>${wr}% WR · ${picks} picks`;
+      tooltip.classList.add("visible");
+    });
+    dot.addEventListener("mousemove", (e) => {
+      const rect = container.getBoundingClientRect();
+      tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+      tooltip.style.top = `${e.clientY - rect.top - 10}px`;
+    });
+    dot.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("visible");
+    });
+    // Click to open card modal
+    dot.addEventListener("click", () => {
+      const name = dot.dataset.name;
+      const card = appState.allCards.find(c => c.name === name);
+      if (card) openModal(card);
+    });
+  });
+}
+
+function renderHistogram(cards, container, barClass = "leader") {
+  const winRates = cards.map(c => c.stats?.winRate ?? 0);
+  
+  // Create bins (5% increments)
+  const binSize = 5;
+  const minBin = Math.floor(Math.min(...winRates) / binSize) * binSize;
+  const maxBin = Math.ceil(Math.max(...winRates) / binSize) * binSize;
+  
+  const bins = [];
+  for (let start = minBin; start < maxBin; start += binSize) {
+    const end = start + binSize;
+    const count = cards.filter(c => {
+      const wr = c.stats?.winRate ?? 0;
+      return wr >= start && wr < end;
+    }).length;
+    const cardsInBin = cards.filter(c => {
+      const wr = c.stats?.winRate ?? 0;
+      return wr >= start && wr < end;
+    });
+    bins.push({ start, end, count, cards: cardsInBin });
+  }
+  
+  const maxCount = Math.max(...bins.map(b => b.count), 1);
+  
+  const width = 280;
+  const height = 160;
+  const padding = { top: 15, right: 15, bottom: 35, left: 30 };
+  const chartW = width - padding.left - padding.right;
+  const chartH = height - padding.top - padding.bottom;
+  
+  const barWidth = chartW / bins.length - 4;
+  const barGap = 4;
+  
+  // Create SVG
+  let svg = `<svg viewBox="0 0 ${width} ${height}" class="histogram-svg">`;
+  
+  // Grid lines
+  svg += `<g class="grid">`;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartH / 4) * i;
+    svg += `<line x1="${padding.left}" y1="${y}" x2="${width - padding.right}" y2="${y}" stroke="currentColor" stroke-opacity="0.1"/>`;
+  }
+  svg += `</g>`;
+  
+  // 25% expected line (for 4-player game)
+  const expected25 = bins.findIndex(b => b.start <= 25 && b.end > 25);
+  if (expected25 >= 0) {
+    const x25 = padding.left + (expected25 + 0.5) * (barWidth + barGap);
+    svg += `<line x1="${x25}" y1="${padding.top}" x2="${x25}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+  }
+  
+  // Bars
+  bins.forEach((bin, i) => {
+    const x = padding.left + i * (barWidth + barGap);
+    const barH = (bin.count / maxCount) * chartH;
+    const y = padding.top + chartH - barH;
+    const cardNames = bin.cards.map(c => c.name).join(", ");
+    
+    svg += `<rect 
+      x="${x}" y="${y}" 
+      width="${barWidth}" height="${barH}" 
+      class="bar ${barClass}" 
+      rx="2"
+      data-range="${bin.start}-${bin.end}%"
+      data-count="${bin.count}"
+      data-cards="${cardNames}"
+    />`;
+    
+    // X-axis label
+    svg += `<text x="${x + barWidth / 2}" y="${height - 8}" text-anchor="middle" class="axis-label">${bin.start}%</text>`;
+  });
+  
+  // Axes
+  svg += `<line x1="${padding.left}" y1="${padding.top + chartH}" x2="${width - padding.right}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
+  svg += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
+  
+  // Y-axis label
+  svg += `<text x="10" y="${height / 2 - 10}" text-anchor="middle" transform="rotate(-90, 10, ${height / 2 - 10})" class="axis-label">Cards</text>`;
+  
+  svg += `</svg>`;
+  const tooltipId = `histogram-tooltip-${barClass}`;
+  svg += `<div class="histogram-tooltip" id="${tooltipId}"></div>`;
+  
+  container.innerHTML = svg;
+  
+  // Add hover tooltips
+  const tooltip = document.getElementById(tooltipId);
+  container.querySelectorAll(".bar").forEach(bar => {
+    bar.addEventListener("mouseenter", (e) => {
+      const range = e.target.dataset.range;
+      const count = e.target.dataset.count;
+      const cardNames = e.target.dataset.cards;
+      tooltip.innerHTML = `<strong>${range}</strong><br>${count} card${count !== "1" ? "s" : ""}${cardNames ? `<br><span class="tooltip-cards">${cardNames}</span>` : ""}`;
+      tooltip.classList.add("visible");
+    });
+    bar.addEventListener("mousemove", (e) => {
+      const rect = container.getBoundingClientRect();
+      tooltip.style.left = `${e.clientX - rect.left + 10}px`;
+      tooltip.style.top = `${e.clientY - rect.top - 10}px`;
+    });
+    bar.addEventListener("mouseleave", () => {
+      tooltip.classList.remove("visible");
+    });
+  });
+}
+
+function renderCardAnalysis(cards, container) {
+  const avgWinRate = cards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / cards.length;
+  const avgPicks = cards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / cards.length;
+  
+  // Find underrated cards (high win rate, low picks)
+  const underrated = cards
+    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
+    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  // Find overrated cards (low win rate, high picks)
+  const overrated = cards
+    .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
+    .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  // Find meta cards (high win rate AND high picks)
+  const meta = cards
+    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
+    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+    .slice(0, 3);
+  
+  let html = "";
+  
+  if (underrated.length > 0) {
+    html += `<div class="analysis-section">
+      <h5 class="analysis-title">💎 Hidden Gems</h5>
+      <p class="analysis-desc">High win rate, low picks</p>
+      <ul class="analysis-list">
+        ${underrated.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
+      </ul>
+    </div>`;
+  }
+  
+  if (overrated.length > 0) {
+    html += `<div class="analysis-section">
+      <h5 class="analysis-title">📉 Overrated</h5>
+      <p class="analysis-desc">Popular but underperforming</p>
+      <ul class="analysis-list">
+        ${overrated.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
+      </ul>
+    </div>`;
+  }
+  
+  if (meta.length > 0) {
+    html += `<div class="analysis-section">
+      <h5 class="analysis-title">🔥 Meta Picks</h5>
+      <p class="analysis-desc">Popular AND winning</p>
+      <ul class="analysis-list">
+        ${meta.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
+      </ul>
+    </div>`;
+  }
+  
+  if (!html) {
+    html = `<p class="analysis-desc">Not enough data variance for analysis</p>`;
+  }
+  
+  container.innerHTML = html;
+  
+  // Add click handlers to analysis items
+  container.querySelectorAll(".analysis-item").forEach(item => {
+    item.addEventListener("click", () => {
+      const name = item.dataset.card;
+      const card = appState.allCards.find(c => c.name === name);
+      if (card) openModal(card);
+    });
+  });
+}
+
+function getCardTier(card, sortedCards) {
+  const index = sortedCards.findIndex(c => c.name === card.name);
+  const percentile = (index / sortedCards.length) * 100;
+  
+  if (percentile <= 10) return { tier: "S", label: "S", color: "tier-s" };
+  if (percentile <= 30) return { tier: "A", label: "A", color: "tier-a" };
+  if (percentile <= 70) return { tier: "B", label: "B", color: "tier-b" };
+  if (percentile <= 90) return { tier: "C", label: "C", color: "tier-c" };
+  return { tier: "D", label: "D", color: "tier-d" };
+}
+
+function renderTierList(cards, container) {
+  // Sort cards by win rate descending
+  const sorted = [...cards].sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0));
+  
+  // Group cards by tier
+  const tiers = {
+    S: { cards: [], label: "S", desc: "Exceptional" },
+    A: { cards: [], label: "A", desc: "Strong" },
+    B: { cards: [], label: "B", desc: "Average" },
+    C: { cards: [], label: "C", desc: "Weak" },
+    D: { cards: [], label: "D", desc: "Struggling" },
+  };
+  
+  sorted.forEach(card => {
+    const tierInfo = getCardTier(card, sorted);
+    tiers[tierInfo.tier].cards.push(card);
+  });
+  
+  let html = "";
+  
+  for (const [key, tier] of Object.entries(tiers)) {
+    if (tier.cards.length === 0) continue;
+    
+    html += `
+      <div class="tier-row">
+        <div class="tier-label tier-${key.toLowerCase()}">${tier.label}</div>
+        <div class="tier-cards">
+          ${tier.cards.map(card => `
+            <div class="tier-card" data-card="${card.name}" title="${card.name}: ${card.stats?.winRate?.toFixed(1)}% WR">
+              <span class="tier-card-name">${card.name}</span>
+              <span class="tier-card-wr">${card.stats?.winRate?.toFixed(1)}%</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
+  
+  container.innerHTML = html;
+  
+  // Add click handlers to tier cards
+  container.querySelectorAll(".tier-card").forEach(tierCard => {
+    tierCard.addEventListener("click", () => {
+      const name = tierCard.dataset.card;
+      const card = appState.allCards.find(c => c.name === name);
+      if (card) openModal(card);
+    });
+  });
+}
+
+function renderInsights(leaders, lore) {
+  const insights = calculateInsights(leaders, lore);
+  const allCards = [...leaders, ...lore];
+  
+  // Store insights in state for badge rendering
+  appState.insights = insights;
+  
+  // Render All Cards insights
+  renderScatterChart(allCards, el.allScatterChart, "all");
+  renderHistogram(allCards, el.allHistogram, "all");
+  renderCardAnalysis(allCards, el.allAnalysis);
+  renderTierList(allCards, el.allTierList);
+  
+  // Render Leader insights
+  renderScatterChart(leaders, el.leaderScatterChart, "leader");
+  renderHistogram(leaders, el.leaderHistogram, "leader");
+  renderCardAnalysis(leaders, el.leaderAnalysis);
+  renderTierList(leaders, el.leaderTierList);
+  
+  // Render Lore insights
+  renderScatterChart(lore, el.loreScatterChart, "lore");
+  renderHistogram(lore, el.loreHistogram, "lore");
+  renderCardAnalysis(lore, el.loreAnalysis);
+  renderTierList(lore, el.loreTierList);
+  
+  // Update footer with total games
+  el.totalGames.textContent = insights.estimatedGames.toLocaleString();
+}
+
+// ========== Card Rendering ==========
+function getScore(card, metric) {
+  return card.stats?.[metric] ?? 0;
+}
+
+function sortCards(cards, metric) {
+  return [...cards].sort((a, b) => {
+    const diff = getScore(b, metric) - getScore(a, metric);
+    return diff !== 0 ? diff : a.name.localeCompare(b.name);
+  });
+}
+
+function matchesFilter(card, query) {
+  if (!query) return true;
+  return normalizeText(card.name).includes(normalizeText(query));
+}
+
+function createCardElement(card, rank, metric) {
+  const div = document.createElement("div");
+  div.className = "card";
+  div.dataset.cardName = card.name;
+  
+  const imgUrl = getImageUrl(card);
+  const isRotated = normalizeText(card.imageClass) === "rotated";
+  const winRate = card.stats?.winRate ?? 0;
+  const picks = card.stats?.timesPicked ?? 0;
+  const wins = card.stats?.wins ?? 0;
+  
+  let rankClass = "";
+  if (rank === 1) rankClass = "rank-1";
+  else if (rank === 2) rankClass = "rank-2";
+  else if (rank === 3) rankClass = "rank-3";
+  
+  // Check if card is selected for comparison
+  const isSelected = appState.compareCards.some((c) => c?.name === card.name);
+  if (isSelected) div.classList.add("selected");
+  
+  div.innerHTML = `
+    <div class="card-rank ${rankClass}">${rank}</div>
+    <div class="card-image">
+      ${imgUrl ? `<img src="${imgUrl}" alt="${card.name}" loading="lazy" ${isRotated ? 'class="rotated"' : ''}>` : ""}
+    </div>
+    <div class="card-info">
+      <div class="card-name">${card.name}</div>
+      <div class="card-stats">
+        <div class="stat">
+          <span class="stat-value ${metric === 'winRate' ? 'highlight' : ''}">${winRate.toFixed(1)}%</span>
+          <span class="stat-label">Win Rate</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value ${metric === 'wins' ? 'highlight' : ''}">${wins}</span>
+          <span class="stat-label">Wins</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value ${metric === 'timesPicked' ? 'highlight' : ''}">${picks}</span>
+          <span class="stat-label">Picked</span>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Click handler
+  div.addEventListener("click", () => {
+    if (appState.compareMode) {
+      toggleCompareCard(card);
+    } else {
+      openModal(card);
+    }
+  });
+  
+  return div;
+}
+
+function renderCards(cards, container, metric, query) {
+  const filtered = cards.filter((c) => matchesFilter(c, query));
+  const sorted = sortCards(filtered, metric);
+  
+  container.innerHTML = "";
+  sorted.forEach((card, i) => {
+    container.appendChild(createCardElement(card, i + 1, metric));
+  });
+}
+
+// ========== Modal ==========
+function openModal(card) {
+  const imgUrl = getImageUrl(card);
+  
+  el.modalImg.src = imgUrl || "";
+  el.modalImg.alt = card.name;
+  el.modalName.textContent = card.name;
+  el.modalText.innerHTML = formatCardText(card.text);
+  
+  const winRate = card.stats?.winRate ?? 0;
+  const wins = card.stats?.wins ?? 0;
+  const picks = card.stats?.timesPicked ?? 0;
+  
+  el.modalStats.innerHTML = `
+    <div class="stat">
+      <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
+      <span class="stat-label">Win Rate</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">${wins}</span>
+      <span class="stat-label">Wins</span>
+    </div>
+    <div class="stat">
+      <span class="stat-value">${picks}</span>
+      <span class="stat-label">Times Picked</span>
+    </div>
+  `;
+  
+  el.modal.classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeModal() {
+  el.modal.classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+// ========== Compare Mode ==========
+function toggleCompareMode() {
+  appState.compareMode = !appState.compareMode;
+  el.compareBtn.classList.toggle("active", appState.compareMode);
+  el.comparePanel.classList.toggle("hidden", !appState.compareMode);
+  
+  if (!appState.compareMode) {
+    appState.compareCards = [null, null];
+    renderCompareSlots();
+    // Re-render to remove selection styling
+    refreshCards();
+  }
+}
+
+function toggleCompareCard(card) {
+  const idx = appState.compareCards.findIndex((c) => c?.name === card.name);
+  
+  if (idx >= 0) {
+    // Remove from comparison
+    appState.compareCards[idx] = null;
+  } else {
+    // Add to comparison
+    const emptySlot = appState.compareCards.findIndex((c) => c === null);
+    if (emptySlot >= 0) {
+      appState.compareCards[emptySlot] = card;
+    } else {
+      // Replace first slot
+      appState.compareCards[0] = card;
+    }
+  }
+  
+  renderCompareSlots();
+  refreshCards();
+}
+
+function renderCompareSlots() {
+  const slots = el.compareSlots.querySelectorAll(".compare-slot");
+  
+  appState.compareCards.forEach((card, i) => {
+    const slot = slots[i];
+    
+    if (card) {
+      const imgUrl = getImageUrl(card);
+      slot.classList.remove("empty");
+      slot.classList.add("filled");
+      slot.innerHTML = `
+        <div class="slot-card">
+          ${imgUrl ? `<img class="slot-img" src="${imgUrl}" alt="${card.name}">` : ""}
+          <div class="slot-info">
+            <div class="slot-name">${card.name}</div>
+            <div class="slot-stats">
+              <span><span class="slot-stat-value">${(card.stats?.winRate ?? 0).toFixed(1)}%</span> WR</span>
+              <span><span class="slot-stat-value">${card.stats?.wins ?? 0}</span> Wins</span>
+              <span><span class="slot-stat-value">${card.stats?.timesPicked ?? 0}</span> Picks</span>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      slot.classList.add("empty");
+      slot.classList.remove("filled");
+      slot.innerHTML = `<span>Select a card</span>`;
+    }
+  });
+}
+
+// ========== UI Wiring ==========
+let refreshCards;
+
+function wireUi(state) {
+  appState.leaders = state.leaders;
+  appState.lore = state.lore;
+  appState.allCards = [...state.leaders, ...state.lore];
+  
+  let currentTab = "leaders";
+  
+  refreshCards = () => {
+    const metric = el.metric.value;
+    const query = el.query.value;
+    renderCards(appState.allCards, el.allCards, metric, query);
+    renderCards(appState.leaders, el.leaderCards, metric, query);
+    renderCards(appState.lore, el.loreCards, metric, query);
+  };
+  
+  el.metric.addEventListener("change", refreshCards);
+  el.query.addEventListener("input", refreshCards);
+  
+  el.tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      el.tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      currentTab = tab.dataset.tab;
+      
+      // Hide all sections first
+      el.allSection.classList.add("hidden");
+      el.leadersSection.classList.add("hidden");
+      el.loreSection.classList.add("hidden");
+      
+      // Show the selected section
+      if (tab.dataset.tab === "all") {
+        el.allSection.classList.remove("hidden");
+      } else if (tab.dataset.tab === "leaders") {
+        el.leadersSection.classList.remove("hidden");
+      } else {
+        el.loreSection.classList.remove("hidden");
+      }
+    });
+  });
+  
+  // Theme toggle
+  el.themeToggle.addEventListener("click", toggleTheme);
+  
+  // Modal
+  el.modalClose.addEventListener("click", closeModal);
+  el.modalBackdrop.addEventListener("click", closeModal);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+  
+  // Compare mode
+  el.compareBtn.addEventListener("click", toggleCompareMode);
+  el.closeCompare.addEventListener("click", toggleCompareMode);
+  
+  return refreshCards;
+}
+
+// ========== Main ==========
+async function main() {
+  initTheme();
+  setStatus("Loading…");
+  
+  try {
+    const [allCards, sheetRows] = await Promise.all([loadCards(), loadSheet()]);
+    const { cards } = joinCardsWithStats(allCards, sheetRows);
+    
+    if (cards.length === 0) {
+      setStatus("No matching cards found.", { isError: true });
+      return;
+    }
+    
+    const leaders = cards.filter((c) => c.stats?.type === "Leader");
+    const lore = cards.filter((c) => c.stats?.type === "Lore");
+    
+    setStatus("");
+    
+    // Render insights first (sets appState.insights for badges)
+    renderInsights(leaders, lore);
+    
+    const refresh = wireUi({ leaders, lore });
+    refresh();
+  } catch (err) {
+    setStatus(err.message, { isError: true });
+  }
+}
+
+main();
