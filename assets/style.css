@@ -86,6 +86,8 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   transition: background 0.3s, color 0.3s;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 .container {
@@ -503,7 +505,34 @@ body {
   text-decoration: underline;
 }
 
-/* Responsive */
+/* Responsive - Tablet */
+@media (max-width: 900px) {
+  .container {
+    padding: 0 16px;
+  }
+  
+  .nav .container {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .tabs {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .controls {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .search {
+    width: 150px;
+  }
+}
+
+/* Responsive - Mobile */
 @media (max-width: 640px) {
   .header {
     padding: 32px 0 16px;
@@ -513,27 +542,111 @@ body {
     font-size: 1.8rem;
   }
   
+  .tagline {
+    font-size: 0.95rem;
+  }
+  
   .nav .container {
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
+  }
+  
+  .tabs {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .tab {
+    padding: 10px 16px;
+    font-size: 0.85rem;
+    white-space: nowrap;
   }
   
   .controls {
     width: 100%;
     justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .btn-compare {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .select {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+    flex: 1;
+    min-width: 120px;
+  }
+  
+  .search {
+    width: 100%;
+    order: -1;
   }
   
   .card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  
+  .card-rank {
+    width: 32px;
+    height: 32px;
+    font-size: 0.85rem;
+    top: 8px;
+    left: 8px;
+  }
+  
+  .card-info {
+    padding: 12px;
+  }
+  
+  .card-name {
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+  }
+  
+  .card-stats {
+    gap: 4px;
+  }
+  
+  .stat {
+    padding: 8px 4px;
+  }
+  
+  .stat-value {
+    font-size: 1rem;
+  }
+  
+  .stat-label {
+    font-size: 0.6rem;
   }
   
   .summary-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   
+  .compare-panel {
+    top: 60px;
+    padding: 16px 0;
+  }
+  
   .compare-slots {
     flex-direction: column;
+    gap: 12px;
+  }
+  
+  .compare-slot {
+    min-width: auto;
+    width: 100%;
   }
   
   .compare-vs {
@@ -542,10 +655,128 @@ body {
   
   .modal-body {
     flex-direction: column;
+    padding: 20px;
+    gap: 20px;
   }
   
   .modal-image {
     max-width: 100%;
+  }
+  
+  .modal-name {
+    font-size: 1.4rem;
+  }
+  
+  .modal-stats {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  
+  .modal-stats .stat {
+    padding: 12px 8px;
+  }
+  
+  .modal-stats .stat-value {
+    font-size: 1.2rem;
+  }
+  
+  .main {
+    padding: 24px 0 60px;
+  }
+  
+  .insight-card {
+    padding: 16px;
+  }
+  
+  .insight-title {
+    font-size: 0.85rem;
+  }
+  
+  .tier-list-container {
+    padding: 16px;
+  }
+  
+  .tier-row {
+    min-height: 40px;
+  }
+  
+  .tier-label {
+    width: 32px;
+    min-width: 32px;
+    font-size: 0.9rem;
+  }
+  
+  .tier-card {
+    padding: 4px 8px;
+    gap: 6px;
+  }
+  
+  .tier-card-wr {
+    font-size: 0.7rem;
+  }
+}
+
+/* Responsive - Small Mobile */
+@media (max-width: 400px) {
+  .container {
+    padding: 0 12px;
+  }
+  
+  .logo {
+    font-size: 1.5rem;
+  }
+  
+  .tagline {
+    font-size: 0.85rem;
+  }
+  
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .card-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .stat-value {
+    font-size: 0.9rem;
+  }
+  
+  .stat-label {
+    font-size: 0.55rem;
+  }
+  
+  .modal-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .quick-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Touch devices - disable hover animations that can cause sticky states */
+@media (hover: none) and (pointer: coarse) {
+  .card:hover {
+    transform: none;
+    box-shadow: var(--shadow-card);
+  }
+  
+  .card:hover .card-rank {
+    transform: none;
+  }
+  
+  .card:hover .card-image img {
+    transform: none;
+  }
+  
+  .card:hover .card-image img.rotated {
+    transform: rotate(90deg) scale(1.35);
+  }
+  
+  .card:active {
+    transform: scale(0.98);
   }
 }
 
