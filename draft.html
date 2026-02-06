@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arcs Draft Helper</title>
+    <meta name="description" content="Draft helper for Arcs. Optimize your leader and lore picks." />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./assets/style.css" />
+    <link rel="stylesheet" href="./assets/draft.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header-inner">
+        <div>
+          <h1 class="logo">Draft Helper</h1>
+          <p class="tagline">Optimize your Arcs leader &amp; lore picks</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container">
+        <div class="controls">
+          <a href="./index.html" class="btn-compare">← Home</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main">
+      <div class="container">
+        <div id="status" class="status">Loading cards…</div>
+
+        <!-- ===== HOW IT WORKS ===== -->
+        <details class="draft-explainer">
+          <summary class="draft-explainer-toggle">How It Works</summary>
+          <div class="draft-explainer-body">
+            <p>
+              This tool simulates an Arcs draft to help you decide which <strong>leader</strong> and <strong>lore</strong> cards to pick.
+              Set up the draft to match your real game: number of players, your seat position, and which cards are in the pool, then let the tool recommend optimal picks.
+            </p>
+            <h4>Setup</h4>
+            <ul>
+              <li><strong>Players</strong> - how many people are drafting (2–4).</li>
+              <li><strong>Your Seat</strong> - which position you're sitting in. Draft order goes from the last player down (e.g. 3→2→1→3→2→1…).</li>
+              <li><strong>Lore per Player</strong> - how many lore cards each player drafts.</li>
+              <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>Data</em> uses community win-rate data from the ranked page.</li>
+              <li><strong>Tier Scoring</strong> - <em>Varied</em> gives a small point spread (±0.25) within each tier based on sub-ranking; <em>Same</em> gives every card in a tier the exact same score.</li>
+              <li><strong>Leader Weight</strong> - how much more a leader is worth relative to a lore card (e.g. 3× means a leader's score is tripled).</li>
+              <li><strong>Draft Pool</strong> - select the exact leaders and lore cards that are available in your game. Use <em>Random</em> to fill or <em>Clear</em> to reset.</li>
+            </ul>
+            <h4>Drafting</h4>
+            <ul>
+              <li>Once you start, the tool shows whose turn it is and which cards are available.</li>
+              <li>The card marked <strong>Best</strong> is the recommended pick based on <em>opportunity cost</em> - it picks the card you'd lose the most value on if you passed.</li>
+              <li>Click a card to make that pick (for yourself or on behalf of other players to match what they chose in real life).</li>
+              <li><strong>Auto Draft</strong> completes the entire remaining draft using the AI recommendations.</li>
+              <li><strong>Undo</strong> takes back the last pick. <strong>Reset</strong> undoes all picks back to the start.</li>
+            </ul>
+            <h4>Scoring</h4>
+            <p>
+              Each tier has a base score - SS: 7, S: 6, A: 5, B: 4, C: 3, D: 1.
+              With <em>Varied</em> scoring, cards get up to ±0.25 within their tier based on their sub-ranking - so the best card in A-tier scores slightly higher than the worst card in A-tier, even though they share the same tier. Use <em>Same</em> if you consider all cards within a tier to be equal.
+              Leader scores are multiplied by the leader weight.
+              The AI picks the card with the highest <strong>opportunity cost</strong>: the biggest drop-off between that card and the replacement you'd likely end up with if you skip it.
+            </p>
+          </div>
+        </details>
+
+        <details class="draft-explainer">
+          <summary class="draft-explainer-toggle">Draft Strategy</summary>
+          <div class="draft-explainer-body">
+            <p>The most important thing in drafting in arcs is that leaders matter far more than lores.</strong> In my experience A single tier difference in leaders is roughly equivalent to a 3-tier difference in lore. Only prioritize a lore card over a leader if the available leaders are all close in strength.</p>
+            <p>The tool does not keep these in mind, but in your real game draft you should also consider:</p>
+            <ul>
+              <li>Draft for strength or flexibility first (this is what the tier lists and tool help with!), then for combos </li>
+              <li>Building starting locations</li>
+              <li>Starting court</li>
+              <li>Counters</li>
+              <li>Synergies between your and opposing leaders</li>
+              <li>Denial of all of the above for other players</li>
+            </ul>
+            <p>
+              <strong>A note on player counts:</strong> Laurens's tier list is built around 3–4 player games, and the community data is from 4-player games. The 2-player mode is included for convenience - relative card strengths are similar enough to be useful, but take recommendations with a grain of salt at that count.
+            </p>
+          </div>
+        </details>
+
+        <!-- ===== SETUP PANEL ===== -->
+        <div id="setupPanel" class="draft-setup">
+          <h2 class="draft-section-title">Draft Settings</h2>
+          <div class="setup-grid">
+            <!-- Players -->
+            <div class="setup-group">
+              <label class="setup-label">Players</label>
+              <div class="btn-group" id="playerCountGroup">
+                <button class="btn-option" data-value="2">2</button>
+                <button class="btn-option active" data-value="3">3</button>
+                <button class="btn-option" data-value="4">4</button>
+              </div>
+            </div>
+            <!-- Your Seat -->
+            <div class="setup-group">
+              <label class="setup-label">Your Seat</label>
+              <div class="btn-group" id="seatGroup">
+                <button class="btn-option active" data-value="1">1st</button>
+                <button class="btn-option" data-value="2">2nd</button>
+                <button class="btn-option" data-value="3">3rd</button>
+              </div>
+            </div>
+            <!-- Lore per Player -->
+            <div class="setup-group">
+              <label class="setup-label">Lore per Player</label>
+              <div class="btn-group" id="lorePerPlayerGroup">
+                <button class="btn-option active" data-value="1">1</button>
+                <button class="btn-option" data-value="2">2</button>
+                <button class="btn-option" data-value="3">3</button>
+              </div>
+            </div>
+            <!-- Leaders in Pool -->
+            <div class="setup-group">
+              <label class="setup-label">Leaders in Pool</label>
+              <input id="leaderPoolSize" type="number" class="setup-input" min="2" max="16" value="4" />
+            </div>
+            <!-- Lores in Pool -->
+            <div class="setup-group">
+              <label class="setup-label">Lores in Pool</label>
+              <input id="lorePoolSize" type="number" class="setup-input" min="2" max="28" value="4" />
+            </div>
+            <!-- Tier Source -->
+            <div class="setup-group">
+              <label class="setup-label">Tier Source</label>
+              <div class="btn-group" id="tierSourceGroup">
+                <button class="btn-option active" data-value="personal">Laurens's</button>
+                <button class="btn-option" data-value="data">Data</button>
+              </div>
+            </div>
+            <!-- Tier Scoring -->
+            <div class="setup-group">
+              <label class="setup-label">Tier Scoring</label>
+              <div class="btn-group" id="tierScoringGroup">
+                <button class="btn-option active" data-value="varied">Varied</button>
+                <button class="btn-option" data-value="same">Same</button>
+              </div>
+            </div>
+            <!-- Leader Weight -->
+            <div class="setup-group">
+              <label class="setup-label">Leader Weight <span id="weightDisplay" class="weight-display">3×</span></label>
+              <input id="leaderWeight" type="range" class="setup-range" min="1" max="5" step="0.1" value="3" list="weightTicks" />
+              <datalist id="weightTicks">
+                <option value="1"></option>
+                <option value="1.5"></option>
+                <option value="2"></option>
+                <option value="2.5"></option>
+                <option value="3"></option>
+                <option value="3.5"></option>
+                <option value="4"></option>
+                <option value="4.5"></option>
+                <option value="5"></option>
+              </datalist>
+              <div class="range-labels"><span>1×</span><span>2×</span><span>3×</span><span>4×</span><span>5×</span></div>
+            </div>
+          </div>
+
+          <!-- Card Pool Selection -->
+          <h2 class="draft-section-title" style="margin-top: 32px;">Select Draft Pool</h2>
+
+          <div class="balanced-draft-action">
+            <div class="balanced-wrapper">
+              <button id="balancedDraft" class="btn-balanced">Generate Balanced Setup</button>
+              <button id="balancedSettingsToggle" class="btn-balanced-settings" aria-label="Settings">⚙</button>
+            </div>
+            <div id="balancedSettings" class="balanced-settings hidden">
+              <div class="balanced-setting">
+                <label class="setup-label">Leader Tiers</label>
+                <div class="btn-group" id="leaderTierConstraint">
+                  <button class="btn-option active" data-value="any">Any</button>
+                  <button class="btn-option" data-value="unique">All Different</button>
+                  <button class="btn-option" data-value="same">All Same</button>
+                </div>
+              </div>
+              <div class="balanced-setting">
+                <label class="setup-label">Lore Tiers</label>
+                <div class="btn-group" id="loreTierConstraint">
+                  <button class="btn-option active" data-value="any">Any</button>
+                  <button class="btn-option" data-value="unique">All Different</button>
+                  <button class="btn-option" data-value="same">All Same</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pool-section">
+            <div class="pool-header">
+              <h3 class="pool-title">Leaders <span id="leaderPoolCount" class="pool-count">(0 / 4)</span></h3>
+              <div class="pool-actions">
+                <button id="randomLeaders" class="btn-sm">Random</button>
+                <button id="clearLeaders" class="btn-sm">Clear</button>
+              </div>
+            </div>
+            <div id="leaderPool" class="pool-grid"></div>
+          </div>
+
+          <div class="pool-section">
+            <div class="pool-header">
+              <h3 class="pool-title">Lore <span id="lorePoolCount" class="pool-count">(0 / 4)</span></h3>
+              <div class="pool-actions">
+                <button id="randomLore" class="btn-sm">Random</button>
+                <button id="clearLore" class="btn-sm">Clear</button>
+              </div>
+            </div>
+            <div id="lorePool" class="pool-grid"></div>
+          </div>
+
+          <div class="setup-actions">
+            <button id="startDraft" class="btn-primary" disabled>Start Draft</button>
+          </div>
+        </div>
+
+        <!-- ===== DRAFT PANEL ===== -->
+        <div id="draftPanel" class="draft-board hidden">
+          <div class="draft-top-bar">
+            <div id="draftPhaseLabel" class="draft-phase">Draft</div>
+            <div class="draft-actions">
+              <button id="saveDraftImg" class="btn-sm" style="display:none">📷 Save Image</button>
+              <button id="autoDraftBtn" class="btn-sm">Auto Draft</button>
+              <button id="undoBtn" class="btn-sm" disabled>Undo</button>
+              <button id="resetDraft" class="btn-sm btn-danger">Reset</button>
+            </div>
+          </div>
+
+          <!-- Player Boards -->
+          <div id="playerBoards" class="player-boards"></div>
+
+          <!-- Available Cards -->
+          <div class="available-section">
+            <h3 class="available-title">Available Cards</h3>
+            <div id="availableCards" class="available-grid"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="container">
+        <p><a href="./tierlist.html">My Tier List</a> · <a href="./ranked.html">Data Rankings</a> · <a href="./index.html">Home</a></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./assets/draft-app.js"></script>
+  </body>
+</html>

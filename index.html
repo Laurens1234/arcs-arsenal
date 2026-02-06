@@ -37,6 +37,14 @@
         animation-delay: 0.1s;
       }
 
+      .home-card:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+
+      .home-card:nth-child(4) {
+        animation-delay: 0.3s;
+      }
+
       .home-card:hover {
         transform: translateY(-8px) scale(1.02);
         border-color: var(--accent);
@@ -148,6 +156,26 @@
               <h2 class="home-card-title">Generated Cards</h2>
               <p class="home-card-desc">My custom Leaders and Lore.</p>
               <span class="home-card-arrow">View Cards →</span>
+            </div>
+          </a>
+          <a href="./tierlist.html" class="home-card">
+            <div class="home-card-preview">
+              <iframe src="./tierlist.html" tabindex="-1" aria-hidden="true" loading="lazy"></iframe>
+            </div>
+            <div class="home-card-body">
+              <h2 class="home-card-title">My Tier List</h2>
+              <p class="home-card-desc">Personal rankings for all leaders and lore cards, from S to D.</p>
+              <span class="home-card-arrow">View Tier List →</span>
+            </div>
+          </a>
+          <a href="./draft.html" class="home-card">
+            <div class="home-card-preview">
+              <iframe src="./draft.html" tabindex="-1" aria-hidden="true" loading="lazy"></iframe>
+            </div>
+            <div class="home-card-body">
+              <h2 class="home-card-title">Draft Helper</h2>
+              <p class="home-card-desc">Optimize your leader &amp; lore draft picks with tier-based scoring.</p>
+              <span class="home-card-arrow">Open Draft Helper →</span>
             </div>
           </a>
         </div>

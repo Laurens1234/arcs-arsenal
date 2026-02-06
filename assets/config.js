@@ -17,6 +17,10 @@ export const CONFIG = {
   // If unknown, we will guess from headers.
   preferredNameColumns: ["Card", "Card Name", "Name"],
 
+  // Personal tier list Google Sheet (CSV export)
+  tierListCsvUrl:
+    "https://docs.google.com/spreadsheets/d/1DRyF7uWRgXGXJCW_DZbW5nprsXK_l_BzyVLjZBfE4B4/export?format=csv&gid=0",
+
   // Only show cards with any of these tags. Leave empty to show everything.
   // Example: ["Base Court", "Lore", "Leader"]
   includeAnyTags: [],
