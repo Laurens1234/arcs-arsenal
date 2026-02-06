@@ -137,6 +137,17 @@ body {
   animation: shimmer 3s linear infinite;
 }
 
+.logo a {
+  text-decoration: none;
+  color: inherit;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background: inherit;
+  background-size: inherit;
+  animation: inherit;
+}
+
 .tagline {
   color: var(--text-muted);
   margin-top: 8px;
