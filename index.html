@@ -3,20 +3,118 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Arcs Leaders & Lore Ranked</title>
-    <meta name="description" content="Arcs cards ranked with win rates and pick statistics." />
+    <title>Arcs Hub</title>
+    <meta name="description" content="Arcs board game tools — ranked data and generated cards." />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./assets/style.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      .home-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        gap: 32px;
+        padding: 60px 0 80px;
+      }
+
+      .home-card {
+        position: relative;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        text-decoration: none;
+        color: var(--text);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    border-color 0.3s,
+                    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-card);
+        animation: fadeInUp 0.5s ease-out backwards;
+      }
+
+      .home-card:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+
+      .home-card:hover {
+        transform: translateY(-8px) scale(1.02);
+        border-color: var(--accent);
+        box-shadow: var(--shadow-hover);
+      }
+
+      .home-card-preview {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        overflow: hidden;
+        background: var(--bg);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .home-card-preview iframe {
+        width: 200%;
+        height: 200%;
+        border: none;
+        pointer-events: none;
+        transform: scale(0.5);
+        transform-origin: top left;
+      }
+
+      .home-card-preview::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.15) 100%);
+        pointer-events: none;
+      }
+
+      .home-card-body {
+        padding: 24px 32px 32px;
+        text-align: center;
+      }
+
+      .home-card-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 12px;
+        background: linear-gradient(135deg, var(--accent), #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .home-card-desc {
+        color: var(--text-muted);
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+
+      .home-card-arrow {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 24px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .home-card:hover .home-card-arrow {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: var(--accent-glow);
+      }
+    </style>
   </head>
   <body>
     <header class="header">
       <div class="container header-inner">
         <div>
-          <h1 class="logo">Arcs Ranked</h1>
-          <p class="tagline">Leaders & Lore win rates from Arcs League games</p>
+          <h1 class="logo">Arcs Hub</h1>
+          <p class="tagline">Tools &amp; data for the Arcs board game</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
           <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -29,189 +127,49 @@
       </div>
     </header>
 
-    <nav class="nav">
-      <div class="container">
-        <div class="tabs">
-          <button class="tab active" data-tab="leaders">Leaders</button>
-          <button class="tab" data-tab="lore">Lore</button>
-          <button class="tab" data-tab="all">All Cards</button>
-        </div>
-        <div class="controls">
-          <button id="compareBtn" class="btn-compare">Compare</button>
-          <select id="metric" class="select">
-            <option value="winRate">Win Rate %</option>
-            <option value="wins">Total Wins</option>
-            <option value="timesPicked">Times Picked</option>
-          </select>
-          <input id="query" type="search" class="search" placeholder="Search…" />
-        </div>
-      </div>
-    </nav>
-
-    <!-- Compare Panel -->
-    <div id="comparePanel" class="compare-panel hidden">
-      <div class="container">
-        <div class="compare-header">
-          <h3>Compare Cards</h3>
-          <button id="closeCompare" class="btn-close">✕</button>
-        </div>
-        <p class="compare-hint">Select up to 2 cards to compare</p>
-        <div id="compareSlots" class="compare-slots">
-          <div class="compare-slot empty" data-slot="0">
-            <span>Select a card</span>
-          </div>
-          <div class="compare-vs">VS</div>
-          <div class="compare-slot empty" data-slot="1">
-            <span>Select a card</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <main class="main">
       <div class="container">
-        <div id="status" class="status"></div>
-        
-        <section id="leadersSection" class="section">
-          <!-- Leaders Insights -->
-          <div class="insights-grid section-insights">
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 class="insight-title">Win Rate vs Popularity</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing each leader's win rate vs how often they're picked. Dashed lines show averages. Cards in the top-left are hidden gems (high WR, low picks). Cards in the bottom-right are overrated (low WR, high picks).">?</button>
-              </div>
-              <p class="insight-subtitle">Do popular leaders actually win?</p>
-              <div id="leaderScatterChart" class="scatter-chart"></div>
+        <div class="home-grid">
+          <a href="./ranked.html" class="home-card">
+            <div class="home-card-preview">
+              <iframe src="./ranked.html" tabindex="-1" aria-hidden="true" loading="lazy"></iframe>
             </div>
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 id="leaderHistogramTitle" class="insight-title">Win Rate Distribution</h4>
-                <button id="leaderHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed. In a 4-player game, 25% is expected average. Bars show how many cards fall into each win rate bracket.">?</button>
-              </div>
-              <p id="leaderHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
-              <div id="leaderHistogram" class="histogram-chart"></div>
+            <div class="home-card-body">
+              <h2 class="home-card-title">Leaders & Lore Ranked</h2>
+              <p class="home-card-desc">Win rates, pick statistics, tier lists and insights from Arcs League games.</p>
+              <span class="home-card-arrow">View Rankings →</span>
             </div>
-            <div class="insight-card">
-              <div class="insight-header">
-                <h4 class="insight-title">Leader Analysis</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to leader averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
-              </div>
-              <div id="leaderAnalysis" class="card-analysis"></div>
+          </a>
+          <a href="./generated-cards.html" class="home-card">
+            <div class="home-card-preview">
+              <iframe src="./generated-cards.html" tabindex="-1" aria-hidden="true" loading="lazy"></iframe>
             </div>
-          </div>
-          <!-- Tier List -->
-          <div class="tier-list-container">
-            <div class="tier-list-header">
-              <h4 class="tier-list-title">Performance Tiers</h4>
-              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
+            <div class="home-card-body">
+              <h2 class="home-card-title">Generated Cards</h2>
+              <p class="home-card-desc">My custom Leaders and Lore.</p>
+              <span class="home-card-arrow">View Cards →</span>
             </div>
-            <div id="leaderTierList" class="tier-list"></div>
-          </div>
-          <div id="leaderCards" class="card-grid"></div>
-        </section>
-
-        <section id="loreSection" class="section hidden">
-          <!-- Lore Insights -->
-          <div class="insights-grid section-insights">
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 class="insight-title">Win Rate vs Popularity</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing each lore card's win rate vs how often it's picked. Dashed lines show averages. Cards in the top-left are hidden gems (high WR, low picks). Cards in the bottom-right are overrated (low WR, high picks).">?</button>
-              </div>
-              <p class="insight-subtitle">Do popular lore cards actually win?</p>
-              <div id="loreScatterChart" class="scatter-chart"></div>
-            </div>
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 id="loreHistogramTitle" class="insight-title">Win Rate Distribution</h4>
-                <button id="loreHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed. In a 4-player game, 25% is expected average. Bars show how many cards fall into each win rate bracket.">?</button>
-              </div>
-              <p id="loreHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
-              <div id="loreHistogram" class="histogram-chart"></div>
-            </div>
-            <div class="insight-card">
-              <div class="insight-header">
-                <h4 class="insight-title">Lore Analysis</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to lore averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
-              </div>
-              <div id="loreAnalysis" class="card-analysis"></div>
-            </div>
-          </div>
-          <!-- Tier List -->
-          <div class="tier-list-container">
-            <div class="tier-list-header">
-              <h4 class="tier-list-title">Performance Tiers</h4>
-              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
-            </div>
-            <div id="loreTierList" class="tier-list"></div>
-          </div>
-          <div id="loreCards" class="card-grid"></div>
-        </section>
-
-        <section id="allSection" class="section hidden">
-          <!-- All Cards Insights -->
-          <div class="insights-grid section-insights">
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 class="insight-title">Win Rate vs Popularity</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing all cards' win rate vs how often they're picked. Leaders are teal, Lore are purple. Dashed lines show averages.">?</button>
-              </div>
-              <p class="insight-subtitle">Leaders vs Lore performance</p>
-              <div id="allScatterChart" class="scatter-chart"></div>
-            </div>
-            <div class="insight-card insight-chart">
-              <div class="insight-header">
-                <h4 id="allHistogramTitle" class="insight-title">Win Rate Distribution</h4>
-                <button id="allHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed across all cards. In a 4-player game, 25% is expected average.">?</button>
-              </div>
-              <p id="allHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
-              <div id="allHistogram" class="histogram-chart"></div>
-            </div>
-            <div class="insight-card">
-              <div class="insight-header">
-                <h4 class="insight-title">Overall Analysis</h4>
-                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
-              </div>
-              <div id="allAnalysis" class="card-analysis"></div>
-            </div>
-          </div>
-          <!-- Tier List -->
-          <div class="tier-list-container">
-            <div class="tier-list-header">
-              <h4 class="tier-list-title">Performance Tiers (All Cards)</h4>
-              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile across all cards:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
-            </div>
-            <div id="allTierList" class="tier-list"></div>
-          </div>
-          <div id="allCards" class="card-grid"></div>
-        </section>
+          </a>
+        </div>
       </div>
     </main>
 
-    <!-- Card Modal -->
-    <div id="cardModal" class="modal hidden">
-      <div class="modal-backdrop"></div>
-      <div class="modal-content">
-        <button class="modal-close">✕</button>
-        <div class="modal-body">
-          <div class="modal-image">
-            <img id="modalImg" src="" alt="" />
-          </div>
-          <div class="modal-info">
-            <h2 id="modalName" class="modal-name"></h2>
-            <div id="modalStats" class="modal-stats"></div>
-            <div id="modalText" class="modal-text"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <footer class="footer">
       <div class="container">
-        <p>Based on <span id="totalGames">0</span> games · Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a> · Card images from <a href="https://github.com/buriedgiantstudios/cards" target="_blank">buriedgiantstudios/cards</a></p>
       </div>
     </footer>
 
-    <script type="module" src="./assets/app.js"></script>
+    <script>
+      // Theme toggle (shared with sub-pages via localStorage)
+      const saved = localStorage.getItem("arcs-theme");
+      if (saved) document.documentElement.dataset.theme = saved;
+
+      document.getElementById("themeToggle").addEventListener("click", () => {
+        const current = document.documentElement.dataset.theme || "dark";
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem("arcs-theme", next);
+      });
+    </script>
   </body>
 </html>

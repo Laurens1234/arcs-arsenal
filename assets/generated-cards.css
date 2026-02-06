@@ -1,0 +1,164 @@
+/* ========== Generated Cards Page Styles ========== */
+
+/* Type badge on cards */
+.gen-card-type-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(8px);
+}
+
+.gen-card-type-badge.leader {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.85), rgba(61, 185, 176, 0.85));
+  color: #000;
+  box-shadow: 0 2px 10px rgba(78, 205, 196, 0.4);
+}
+
+.gen-card-type-badge.lore {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.85), rgba(139, 92, 246, 0.85));
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(167, 139, 250, 0.4);
+}
+
+/* Lightbox */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox.hidden {
+  display: none;
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+}
+
+.lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.lightbox-content img {
+  max-width: 100%;
+  max-height: 85vh;
+  border-radius: var(--radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  object-fit: contain;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: -16px;
+  right: -16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-solid);
+  color: var(--text);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.lightbox-close:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+/* Generated cards page: simpler card-info (no stats) */
+.card-info {
+  /* Inherits from main style.css */
+}
+
+/* ========== Print Container (hidden on screen) ========== */
+.print-container {
+  display: none;
+}
+
+/* ========== Print Media Query ========== */
+@media print {
+  /* Reset page background */
+  html, body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Hide everything except the print container */
+  body > *:not(.print-container) {
+    display: none !important;
+  }
+
+  .print-container {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 0mm;
+    padding: 0;
+    margin: 0;
+    align-items: flex-start;
+    align-content: flex-start;
+    background: white;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  /* Leader cards: exactly 70×120mm */
+  .print-card-leader {
+    width: 70mm;
+    height: 120mm;
+  }
+
+  /* Lore cards: exactly 63×88mm */
+  .print-card-lore {
+    width: 63mm;
+    height: 88mm;
+  }
+
+  .print-card {
+    overflow: hidden;
+    flex-shrink: 0;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    margin: 5mm;
+    size: A4;
+  }
+}

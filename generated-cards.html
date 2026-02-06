@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arcs Generated Cards</title>
+    <meta name="description" content="My custom Arcs leaders and lore cards." />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./assets/style.css" />
+    <link rel="stylesheet" href="./assets/generated-cards.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header-inner">
+        <div>
+          <h1 class="logo">Arcs Generated Cards</h1>
+          <p class="tagline">My custom leaders &amp; lore</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container">
+        <div class="tabs">
+          <button class="tab active" data-tab="leaders">Leaders</button>
+          <button class="tab" data-tab="lore">Lore</button>
+          <button class="tab" data-tab="all">All</button>
+        </div>
+        <div class="controls">
+          <input id="query" type="search" class="search" placeholder="Search…" />
+          <button id="printBtn" class="btn-compare">🖨 Print</button>
+          <a href="./index.html" class="btn-compare">← Home</a>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main">
+      <div class="container">
+        <div id="status" class="status">Loading cards…</div>
+        <div id="cardGrid" class="card-grid"></div>
+      </div>
+    </main>
+
+    <!-- Lightbox Modal -->
+    <div id="lightbox" class="lightbox hidden">
+      <div class="lightbox-backdrop"></div>
+      <div class="lightbox-content">
+        <button class="lightbox-close">✕</button>
+        <img id="lightboxImg" src="" alt="" />
+      </div>
+    </div>
+
+    <!-- Hidden print-only container (populated by JS, visible only in @media print) -->
+    <div id="printContainer" class="print-container"></div>
+
+    <footer class="footer">
+      <div class="container">
+        <p><a href="https://github.com/Laurens1234/Arcs-Leader-Generator" target="_blank">Card Generator</a> · <a href="https://docs.google.com/document/d/11SS9AGXG0q3Vlb67Kl0mdvhnE0kKLfgCDgx5LVDwsGk/edit?tab=t.0" target="_blank">Custom Leader Doc</a> · <a href="https://docs.google.com/document/d/1h6-xdxll0yu4Z4jpPP3nQABGjleV_feJEBstWy6LAls/edit?tab=t.0#heading=h.qdla89vbbqf6" target="_blank">Custom Lore Doc</a> · <a href="./ranked.html">Ranked Data</a> · <a href="./index.html">Home</a></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./assets/generated-cards-app.js"></script>
+  </body>
+</html>
