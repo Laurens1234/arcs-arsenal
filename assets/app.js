@@ -1,5 +1,6 @@
 import yaml from "https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm";
 import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
+import { buildCommunityStats } from "./community-data.js";
 import { CONFIG } from "./config.js";
 
 // ========== DOM Elements ==========
@@ -55,6 +56,11 @@ const el = {
   allHistogramTitle: document.getElementById("allHistogramTitle"),
   allHistogramSubtitle: document.getElementById("allHistogramSubtitle"),
   allHistogramHelp: document.getElementById("allHistogramHelp"),
+  // Data source toggle
+  dataSourceGroup: document.getElementById("dataSourceGroup"),
+  playerCountGroup: document.getElementById("playerCountGroup"),
+  dataSourceLabel: document.getElementById("dataSourceLabel"),
+  pageTagline: document.getElementById("pageTagline"),
 };
 
 // ========== State ==========
@@ -65,6 +71,10 @@ let appState = {
   compareMode: false,
   compareCards: [null, null],
   insights: null,
+  dataSource: "league",      // "league" | "community"
+  playerCount: "4p",         // "3p" | "4p" (for community)
+  yamlCards: [],              // loaded card definitions
+  leagueCards: null,          // { leaders, lore } from league data
 };
 
 // ========== Utilities ==========
@@ -217,44 +227,71 @@ function joinCardsWithStats(cards, sheetRows) {
 }
 
 // ========== Data Insights ==========
-function calculateInsights(leaders, lore) {
+function calculateInsights(leaders, lore, gamesOverride) {
   const allCards = [...leaders, ...lore];
+  const isCommunity = allCards[0]?.stats?.isCommunity;
   
   // Calculate averages
   const avgWinRate = allCards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / allCards.length;
-  const avgPicks = allCards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / allCards.length;
+  const avgPicks = isCommunity ? 0 : allCards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / allCards.length;
   
   const leaderAvgWR = leaders.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / leaders.length;
   const loreAvgWR = lore.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / lore.length;
   
-  // Total games (approximate from leader picks divided by players per game)
-  const totalPicks = leaders.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0);
-  const estimatedGames = Math.round(totalPicks / 4); // 4 players per game
+  // Total games — use override if provided, else estimate from leader picks
+  const totalPicks = isCommunity ? 0 : leaders.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0);
+  const estimatedGames = gamesOverride ?? Math.round(totalPicks / 4);
   
-  // Find underrated cards (high win rate, low picks)
-  const underrated = allCards
-    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
-    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
-    .slice(0, 3);
+  let underrated = [];
+  let overrated = [];
+  let meta = [];
+  let consistent = [];
   
-  // Find overrated cards (low win rate, high picks)
-  const overrated = allCards
-    .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
-    .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
-    .slice(0, 3);
-  
-  // Find meta cards (high win rate AND high picks)
-  const meta = allCards
-    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
-    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
-    .slice(0, 3);
-  
-  // Most consistent (closest to 25% win rate with decent sample)
-  const minPicks = avgPicks * 0.5;
-  const consistent = allCards
-    .filter(c => c.stats?.timesPicked >= minPicks)
-    .sort((a, b) => Math.abs((a.stats?.winRate ?? 0) - 25) - Math.abs((b.stats?.winRate ?? 0) - 25))
-    .slice(0, 3);
+  if (isCommunity) {
+    // For community data, use rank position vs win rate for insights
+    const avgRank = allCards.reduce((sum, c) => sum + (c.stats?.rankPosition ?? 0), 0) / allCards.length;
+    // Hidden gems: high WR but drafted late (high rank number)
+    underrated = allCards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.rankPosition > avgRank)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Overrated: low WR but drafted early (low rank number)
+    overrated = allCards
+      .filter(c => c.stats?.winRate < avgWinRate && c.stats?.rankPosition < avgRank)
+      .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Meta: high WR AND drafted early
+    meta = allCards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.rankPosition < avgRank)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Most consistent (closest to expected average WR)
+    consistent = allCards
+      .sort((a, b) => Math.abs((a.stats?.winRate ?? 0) - avgWinRate) - Math.abs((b.stats?.winRate ?? 0) - avgWinRate))
+      .slice(0, 3);
+  } else {
+    // Find underrated cards (high win rate, low picks)
+    underrated = allCards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Find overrated cards (low win rate, high picks)
+    overrated = allCards
+      .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
+      .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Find meta cards (high win rate AND high picks)
+    meta = allCards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Most consistent (closest to 25% win rate with decent sample)
+    const minPicks = avgPicks * 0.5;
+    consistent = allCards
+      .filter(c => c.stats?.timesPicked >= minPicks)
+      .sort((a, b) => Math.abs((a.stats?.winRate ?? 0) - 25) - Math.abs((b.stats?.winRate ?? 0) - 25))
+      .slice(0, 3);
+  }
   
   return {
     avgWinRate,
@@ -271,6 +308,8 @@ function calculateInsights(leaders, lore) {
 
 function getCardBadge(card, insights) {
   const wr = card.stats?.winRate ?? 0;
+  // Community data has no picks – badges based on picks don't apply
+  if (card.stats?.isCommunity) return null;
   const picks = card.stats?.timesPicked ?? 0;
   
   if (wr > insights.avgWinRate + 5 && picks < insights.avgPicks * 0.8) {
@@ -286,7 +325,12 @@ function getCardBadge(card, insights) {
 }
 
 function renderScatterChart(cards, container, dotClass = "leader") {
-  const maxPicks = Math.max(...cards.map(c => c.stats?.timesPicked ?? 0));
+  const isCommunity = cards[0]?.stats?.isCommunity;
+  
+  // X-axis: rank position (inverted so rank 1 is rightmost) for community, times picked for league
+  const xValues = cards.map(c => isCommunity ? (c.stats?.rankPosition ?? 0) : (c.stats?.timesPicked ?? 0));
+  const maxX = Math.max(...xValues);
+  const minX = isCommunity ? 1 : 0;
   const maxWR = Math.max(...cards.map(c => c.stats?.winRate ?? 0));
   const minWR = Math.min(...cards.map(c => c.stats?.winRate ?? 0));
   
@@ -296,9 +340,11 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
   
-  // Scale functions
-  const xScale = (picks) => padding.left + (picks / maxPicks) * chartW;
-  const yScale = (wr) => padding.top + chartH - ((wr - minWR) / (maxWR - minWR)) * chartH;
+  // Scale functions — for community, invert X so rank 1 is on the right
+  const xScale = isCommunity
+    ? (rank) => padding.left + ((maxX - rank) / (maxX - minX)) * chartW
+    : (picks) => padding.left + (picks / (maxX || 1)) * chartW;
+  const yScale = (wr) => padding.top + chartH - ((wr - minWR) / ((maxWR - minWR) || 1)) * chartH;
   
   // Create SVG
   let svg = `<svg viewBox="0 0 ${width} ${height}" class="scatter-svg">`;
@@ -316,21 +362,24 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   svg += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
   
   // Axis labels
-  svg += `<text x="${width / 2}" y="${height - 5}" text-anchor="middle" class="axis-label">Times Picked</text>`;
+  const xLabel = isCommunity ? "Draft Rank (← later | earlier →)" : "Times Picked";
+  svg += `<text x="${width / 2}" y="${height - 5}" text-anchor="middle" class="axis-label">${xLabel}</text>`;
   svg += `<text x="12" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 12, ${height / 2})" class="axis-label">Win Rate %</text>`;
   
   // Average lines (dashed)
-  const avgPicks = cards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / cards.length;
+  const avgX = xValues.reduce((sum, v) => sum + v, 0) / xValues.length;
   const avgWR = cards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / cards.length;
-  svg += `<line x1="${xScale(avgPicks)}" y1="${padding.top}" x2="${xScale(avgPicks)}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
+  svg += `<line x1="${xScale(avgX)}" y1="${padding.top}" x2="${xScale(avgX)}" y2="${padding.top + chartH}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
   svg += `<line x1="${padding.left}" y1="${yScale(avgWR)}" x2="${width - padding.right}" y2="${yScale(avgWR)}" stroke="var(--accent)" stroke-opacity="0.4" stroke-dasharray="4"/>`;
   
   // Plot points - use card type for "all" view, otherwise use dotClass
   cards.forEach(card => {
-    const x = xScale(card.stats?.timesPicked ?? 0);
+    const xVal = isCommunity ? (card.stats?.rankPosition ?? 0) : (card.stats?.timesPicked ?? 0);
+    const x = xScale(xVal);
     const y = yScale(card.stats?.winRate ?? 0);
     const cardType = dotClass === "all" ? (card.stats?.type === "Leader" ? "leader" : "lore") : dotClass;
-    svg += `<circle cx="${x}" cy="${y}" r="5" class="dot ${cardType}" data-name="${card.name}" data-wr="${card.stats?.winRate?.toFixed(1)}" data-picks="${card.stats?.timesPicked}" data-type="${card.stats?.type || ''}"/>`;
+    const dataExtra = isCommunity ? `data-rank="${card.stats?.rankPosition}"` : `data-picks="${card.stats?.timesPicked}"`;
+    svg += `<circle cx="${x}" cy="${y}" r="5" class="dot ${cardType}" data-name="${card.name}" data-wr="${card.stats?.winRate?.toFixed(1)}" ${dataExtra} data-type="${card.stats?.type || ''}" data-community="${isCommunity ? '1' : '0'}"/>`;
   });
   
   svg += `</svg>`;
@@ -351,8 +400,13 @@ function renderScatterChart(cards, container, dotClass = "leader") {
     dot.addEventListener("mouseenter", (e) => {
       const name = e.target.dataset.name;
       const wr = e.target.dataset.wr;
-      const picks = e.target.dataset.picks;
-      tooltip.innerHTML = `<strong>${name}</strong><br>${wr}% WR · ${picks} picks`;
+      if (e.target.dataset.community === "1") {
+        const rank = e.target.dataset.rank;
+        tooltip.innerHTML = `<strong>${name}</strong><br>${wr}% WR · Rank #${rank}`;
+      } else {
+        const picks = e.target.dataset.picks;
+        tooltip.innerHTML = `<strong>${name}</strong><br>${wr}% WR · ${picks} picks`;
+      }
       tooltip.classList.add("visible");
     });
     dot.addEventListener("mousemove", (e) => {
@@ -552,33 +606,54 @@ function renderHistogram(cards, container, barClass = "leader", metric = "winRat
 }
 
 function renderCardAnalysis(cards, container) {
+  const isCommunity = cards[0]?.stats?.isCommunity;
   const avgWinRate = cards.reduce((sum, c) => sum + (c.stats?.winRate ?? 0), 0) / cards.length;
-  const avgPicks = cards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / cards.length;
   
-  // Find underrated cards (high win rate, low picks)
-  const underrated = cards
-    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
-    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
-    .slice(0, 3);
+  let underrated, overrated, meta;
   
-  // Find overrated cards (low win rate, high picks)
-  const overrated = cards
-    .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
-    .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
-    .slice(0, 3);
+  if (isCommunity) {
+    const avgRank = cards.reduce((sum, c) => sum + (c.stats?.rankPosition ?? 0), 0) / cards.length;
+    // Hidden gems: high WR but drafted late (high rank number)
+    underrated = cards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.rankPosition > avgRank)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Overrated: low WR but drafted early (low rank number)
+    overrated = cards
+      .filter(c => c.stats?.winRate < avgWinRate && c.stats?.rankPosition < avgRank)
+      .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+      .slice(0, 3);
+    // Meta: high WR AND drafted early
+    meta = cards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.rankPosition < avgRank)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+  } else {
+    const avgPicks = cards.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0) / cards.length;
+    underrated = cards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked < avgPicks)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+    overrated = cards
+      .filter(c => c.stats?.winRate < avgWinRate && c.stats?.timesPicked > avgPicks)
+      .sort((a, b) => (a.stats?.winRate ?? 0) - (b.stats?.winRate ?? 0))
+      .slice(0, 3);
+    meta = cards
+      .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
+      .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
+      .slice(0, 3);
+  }
   
-  // Find meta cards (high win rate AND high picks)
-  const meta = cards
-    .filter(c => c.stats?.winRate > avgWinRate && c.stats?.timesPicked > avgPicks)
-    .sort((a, b) => (b.stats?.winRate ?? 0) - (a.stats?.winRate ?? 0))
-    .slice(0, 3);
+  const gemDesc = isCommunity ? "High win rate, drafted late" : "High win rate, low picks";
+  const overDesc = isCommunity ? "Drafted early but underperforming" : "Popular but underperforming";
+  const metaDesc = isCommunity ? "Drafted early AND winning" : "Popular AND winning";
   
   let html = "";
   
   if (underrated.length > 0) {
     html += `<div class="analysis-section">
-      <h5 class="analysis-title">💎 Hidden Gems</h5>
-      <p class="analysis-desc">High win rate, low picks</p>
+      <h5 class="analysis-title">\u{1F48E} Hidden Gems</h5>
+      <p class="analysis-desc">${gemDesc}</p>
       <ul class="analysis-list">
         ${underrated.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
       </ul>
@@ -587,8 +662,8 @@ function renderCardAnalysis(cards, container) {
   
   if (overrated.length > 0) {
     html += `<div class="analysis-section">
-      <h5 class="analysis-title">📉 Overrated</h5>
-      <p class="analysis-desc">Popular but underperforming</p>
+      <h5 class="analysis-title">\u{1F4C9} Overrated</h5>
+      <p class="analysis-desc">${overDesc}</p>
       <ul class="analysis-list">
         ${overrated.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
       </ul>
@@ -597,8 +672,8 @@ function renderCardAnalysis(cards, container) {
   
   if (meta.length > 0) {
     html += `<div class="analysis-section">
-      <h5 class="analysis-title">🔥 Meta Picks</h5>
-      <p class="analysis-desc">Popular AND winning</p>
+      <h5 class="analysis-title">\u{1F525} Meta Picks</h5>
+      <p class="analysis-desc">${metaDesc}</p>
       <ul class="analysis-list">
         ${meta.map(c => `<li class="analysis-item" data-card="${c.name}"><span class="analysis-name">${c.name}</span> <span class="analysis-stat">${c.stats?.winRate?.toFixed(1)}% WR</span></li>`).join("")}
       </ul>
@@ -682,8 +757,9 @@ function renderTierList(cards, container) {
   });
 }
 
-function renderInsights(leaders, lore, metric = "winRate") {
-  const insights = calculateInsights(leaders, lore);
+function renderInsights(leaders, lore, gamesOverride, metric) {
+  metric = metric || el.metric?.value || "winRate";
+  const insights = calculateInsights(leaders, lore, gamesOverride);
   const allCards = [...leaders, ...lore];
   
   // Store insights in state for badge rendering
@@ -743,8 +819,7 @@ function createCardElement(card, rank, metric) {
   const imgUrl = getImageUrl(card);
   const isRotated = normalizeText(card.imageClass) === "rotated";
   const winRate = card.stats?.winRate ?? 0;
-  const picks = card.stats?.timesPicked ?? 0;
-  const wins = card.stats?.wins ?? 0;
+  const isCommunity = card.stats?.isCommunity;
   
   let rankClass = "";
   if (rank === 1) rankClass = "rank-1";
@@ -755,14 +830,23 @@ function createCardElement(card, rank, metric) {
   const isSelected = appState.compareCards.some((c) => c?.name === card.name);
   if (isSelected) div.classList.add("selected");
   
-  div.innerHTML = `
-    <div class="card-rank ${rankClass}">${rank}</div>
-    <div class="card-image">
-      ${imgUrl ? `<img src="${imgUrl}" alt="${card.name}" loading="lazy" ${isRotated ? 'class="rotated"' : ''}>` : ""}
-    </div>
-    <div class="card-info">
-      <div class="card-name">${card.name}</div>
-      <div class="card-stats">
+  let statsHtml;
+  if (isCommunity) {
+    const pos = card.stats?.rankPosition ?? "–";
+    statsHtml = `
+        <div class="stat">
+          <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
+          <span class="stat-label">Win Rate</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">${pos}</span>
+          <span class="stat-label">Draft Rank</span>
+        </div>
+    `;
+  } else {
+    const picks = card.stats?.timesPicked ?? 0;
+    const wins = card.stats?.wins ?? 0;
+    statsHtml = `
         <div class="stat">
           <span class="stat-value ${metric === 'winRate' ? 'highlight' : ''}">${winRate.toFixed(1)}%</span>
           <span class="stat-label">Win Rate</span>
@@ -775,6 +859,18 @@ function createCardElement(card, rank, metric) {
           <span class="stat-value ${metric === 'timesPicked' ? 'highlight' : ''}">${picks}</span>
           <span class="stat-label">Picked</span>
         </div>
+    `;
+  }
+  
+  div.innerHTML = `
+    <div class="card-rank ${rankClass}">${rank}</div>
+    <div class="card-image">
+      ${imgUrl ? `<img src="${imgUrl}" alt="${card.name}" loading="lazy" ${isRotated ? 'class="rotated"' : ''}>` : ""}
+    </div>
+    <div class="card-info">
+      <div class="card-name">${card.name}</div>
+      <div class="card-stats">
+        ${statsHtml}
       </div>
     </div>
   `;
@@ -811,23 +907,38 @@ function openModal(card) {
   el.modalText.innerHTML = formatCardText(card.text);
   
   const winRate = card.stats?.winRate ?? 0;
-  const wins = card.stats?.wins ?? 0;
-  const picks = card.stats?.timesPicked ?? 0;
+  const isCommunity = card.stats?.isCommunity;
   
-  el.modalStats.innerHTML = `
-    <div class="stat">
-      <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
-      <span class="stat-label">Win Rate</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">${wins}</span>
-      <span class="stat-label">Wins</span>
-    </div>
-    <div class="stat">
-      <span class="stat-value">${picks}</span>
-      <span class="stat-label">Times Picked</span>
-    </div>
-  `;
+  if (isCommunity) {
+    const pos = card.stats?.rankPosition ?? "–";
+    el.modalStats.innerHTML = `
+      <div class="stat">
+        <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
+        <span class="stat-label">Win Rate</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">${pos}</span>
+        <span class="stat-label">Draft Rank</span>
+      </div>
+    `;
+  } else {
+    const wins = card.stats?.wins ?? 0;
+    const picks = card.stats?.timesPicked ?? 0;
+    el.modalStats.innerHTML = `
+      <div class="stat">
+        <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
+        <span class="stat-label">Win Rate</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">${wins}</span>
+        <span class="stat-label">Wins</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value">${picks}</span>
+        <span class="stat-label">Times Picked</span>
+      </div>
+    `;
+  }
   
   el.modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
@@ -970,6 +1081,107 @@ function wireUi(state) {
   return refreshCards;
 }
 
+// ========== Community Data ==========
+function buildCommunityCards(yamlCards, playerCount) {
+  const { stats, games } = buildCommunityStats(playerCount);
+  const statsIndex = new Map(stats.map((s) => [normalizeText(s.name), s]));
+
+  const cards = [];
+  for (const card of yamlCards) {
+    const stat = statsIndex.get(normalizeText(card.name));
+    if (stat) {
+      cards.push({ ...card, stats: stat });
+    }
+  }
+
+  const leaders = cards.filter((c) => c.stats?.type === "Leader");
+  const lore = cards.filter((c) => c.stats?.type === "Lore");
+  return { leaders, lore, games };
+}
+
+function switchDataSource(source, playerCount) {
+  appState.dataSource = source;
+  appState.playerCount = playerCount || appState.playerCount;
+
+  let leaders, lore, games;
+  if (source === "league") {
+    leaders = appState.leagueCards.leaders;
+    lore = appState.leagueCards.lore;
+    games = null; // will be estimated by calculateInsights
+    if (el.dataSourceLabel) {
+      el.dataSourceLabel.innerHTML = 'Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a>';
+    }
+    if (el.pageTagline) {
+      el.pageTagline.textContent = "Leaders & Lore win rates from Arcs League games";
+    }
+  } else {
+    const community = buildCommunityCards(appState.yamlCards, appState.playerCount);
+    leaders = community.leaders;
+    lore = community.lore;
+    games = community.games;
+    if (el.dataSourceLabel) {
+      const label = appState.playerCount === "3p" ? "3-player" : "4-player";
+      el.dataSourceLabel.innerHTML = `Community ${label} data from <a href="https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates" target="_blank">BGG</a>`;
+    }
+    if (el.pageTagline) {
+      const label = appState.playerCount === "3p" ? "3-player" : "4-player";
+      el.pageTagline.textContent = `Leaders & Lore win rates from community ${label} games`;
+    }
+  }
+
+  if (leaders.length === 0 && lore.length === 0) return;
+
+  // Update state
+  appState.leaders = leaders;
+  appState.lore = lore;
+  appState.allCards = [...leaders, ...lore];
+  appState.compareCards = [null, null];
+
+  // For community data, only winRate metric is valid (no picks/wins data)
+  if (source === "community") {
+    el.metric.value = "winRate";
+    // Disable wins / timesPicked options
+    for (const opt of el.metric.options) {
+      opt.disabled = (opt.value === "wins" || opt.value === "timesPicked");
+    }
+  } else {
+    for (const opt of el.metric.options) {
+      opt.disabled = false;
+    }
+  }
+
+  // Re-render everything
+  renderInsights(leaders, lore, games);
+  if (refreshCards) refreshCards();
+}
+
+function wireDataSourceToggle() {
+  if (!el.dataSourceGroup) return;
+
+  el.dataSourceGroup.querySelectorAll(".ds-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      el.dataSourceGroup.querySelectorAll(".ds-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      const value = btn.dataset.value;
+      if (value === "community") {
+        el.playerCountGroup.classList.remove("hidden");
+        switchDataSource("community", appState.playerCount);
+      } else {
+        el.playerCountGroup.classList.add("hidden");
+        switchDataSource("league");
+      }
+    });
+  });
+
+  el.playerCountGroup.querySelectorAll(".ds-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      el.playerCountGroup.querySelectorAll(".ds-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      switchDataSource("community", btn.dataset.value);
+    });
+  });
+}
+
 // ========== Main ==========
 async function main() {
   initTheme();
@@ -977,6 +1189,8 @@ async function main() {
   
   try {
     const [allCards, sheetRows] = await Promise.all([loadCards(), loadSheet()]);
+    appState.yamlCards = allCards;
+
     const { cards } = joinCardsWithStats(allCards, sheetRows);
     
     if (cards.length === 0) {
@@ -987,6 +1201,9 @@ async function main() {
     const leaders = cards.filter((c) => c.stats?.type === "Leader");
     const lore = cards.filter((c) => c.stats?.type === "Lore");
     
+    // Store league data for switching
+    appState.leagueCards = { leaders, lore };
+    
     setStatus("");
     
     // Render insights first (sets appState.insights for badges)
@@ -994,6 +1211,9 @@ async function main() {
     
     const refresh = wireUi({ leaders, lore });
     refresh();
+
+    // Wire up data source toggle
+    wireDataSourceToggle();
   } catch (err) {
     setStatus(err.message, { isError: true });
   }

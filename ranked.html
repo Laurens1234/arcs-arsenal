@@ -18,6 +18,39 @@
     <meta name="theme-color" content="#8b5cf6" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+      .data-source-bar {
+        padding: 10px 0;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+      }
+      .data-source-toggle {
+        display: flex;
+        gap: 4px;
+      }
+      .data-source-toggle.hidden { display: none; }
+      .ds-btn {
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .ds-btn:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .ds-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -27,7 +60,7 @@
       <div class="container header-inner">
         <div>
           <h1 class="logo"><a href="./index.html" style="text-decoration:none;color:inherit">Arcs Ranked</a></h1>
-          <p class="tagline">Leaders & Lore win rates from Arcs League games</p>
+          <p class="tagline" id="pageTagline">Leaders & Lore win rates from Arcs League games</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
           <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -59,6 +92,21 @@
         </div>
       </div>
     </nav>
+
+    <!-- Data Source Toggle -->
+    <div class="data-source-bar">
+      <div class="container" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:0.85rem;font-weight:600;color:var(--text-muted)">Data Source:</span>
+        <div class="data-source-toggle" id="dataSourceGroup">
+          <button class="ds-btn active" data-value="league">League</button>
+          <button class="ds-btn" data-value="community">Community</button>
+        </div>
+        <div class="data-source-toggle hidden" id="playerCountGroup">
+          <button class="ds-btn" data-value="3p">3P (983 games)</button>
+          <button class="ds-btn active" data-value="4p">4P (1272 games)</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Compare Panel -->
     <div id="comparePanel" class="compare-panel hidden">
@@ -220,7 +268,7 @@
 
     <footer class="footer">
       <div class="container">
-        <p>Based on <span id="totalGames">0</span> games · Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a> · Card images from <a href="https://github.com/buriedgiantstudios/cards" target="_blank">buriedgiantstudios/cards</a> · <a href="./custom-cards.html">Custom Cards</a> · <a href="./index.html">Home</a></p>
+        <p>Based on <span id="totalGames">0</span> games · <span id="dataSourceLabel">Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a></span> · Card images from <a href="https://github.com/buriedgiantstudios/cards" target="_blank">buriedgiantstudios/cards</a> · <a href="./custom-cards.html">Custom Cards</a> · <a href="./index.html">Home</a></p>
       </div>
     </footer>
 

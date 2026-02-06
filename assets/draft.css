@@ -79,6 +79,15 @@
   margin: 0 0 6px;
 }
 
+.draft-explainer-body a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.draft-explainer-body a:hover {
+  opacity: 0.8;
+}
+
 /* Setup Panel */
 .draft-setup {
   animation: fadeInUp 0.5s ease-out;
@@ -123,6 +132,7 @@
 /* Button Group */
 .btn-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 

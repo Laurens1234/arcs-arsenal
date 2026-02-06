@@ -66,7 +66,7 @@
               <li><strong>Players</strong> - how many people are drafting (2–4).</li>
               <li><strong>Your Seat</strong> - which position you're sitting in. Draft order goes from the last player down (e.g. 3→2→1→3→2→1…).</li>
               <li><strong>Lore per Player</strong> - how many lore cards each player drafts.</li>
-              <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>Data</em> uses community win-rate data from the ranked page; <em>Custom</em> lets you import your own tier list (export one from the <a href="./tierlist.html">Tier List</a> page).</li>
+              <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>League</em> uses community win-rate data from the Arcs League ranked page; <em>Community 3P/4P</em> uses community draft data from 3-player or 4-player games; <em>Custom</em> lets you import your own tier list (export one from the <a href="./tierlist.html">Tier List</a> page).</li>
               <li><strong>Tier Scoring</strong> - <em>Varied</em> gives a small point spread (±0.25) within each tier based on sub-ranking; <em>Same</em> gives every card in a tier the exact same score.</li>
               <li><strong>Leader Weight</strong> - how much more a leader is worth relative to a lore card (e.g. 3× means a leader's score is tripled).</li>
               <li><strong>Draft Pool</strong> - select the exact leaders and lore cards that are available in your game. Use <em>Random</em> to fill or <em>Clear</em> to reset.</li>
@@ -103,7 +103,7 @@
               <li>Denial of all of the above for other players</li>
             </ul>
             <p>
-              <strong>A note on player counts:</strong> Laurens's tier list is built around 3–4 player games, and the community data is from 4-player games. The 2-player mode is included for convenience. Relative card strengths are similar enough in different player count to be useful, but take recommendations with a grain of salt.
+              <strong>A note on player counts:</strong> Laurens's tier list is built around 3–4 player games, and the League data is from 4-player games. Community data is available for both 3-player (983 games) and 4-player (1272 games). The 2-player mode is included for convenience. Relative card strengths are similar enough across player counts to be useful, but take recommendations with a grain of salt.
             </p>
           </div>
         </details>
@@ -154,7 +154,9 @@
               <label class="setup-label">Tier Source</label>
               <div class="btn-group" id="tierSourceGroup">
                 <button class="btn-option active" data-value="personal">Laurens's</button>
-                <button class="btn-option" data-value="data">Data</button>
+                <button class="btn-option" data-value="data">League</button>
+                <button class="btn-option" data-value="community3p">Community 3P</button>
+                <button class="btn-option" data-value="community4p">Community 4P</button>
                 <button class="btn-option" data-value="custom">Custom</button>
               </div>
               <div id="customTierInput" class="custom-tier-input hidden">

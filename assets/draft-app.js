@@ -1,6 +1,7 @@
 import { toBlob } from "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/+esm";
 import yaml from "https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm";
 import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
+import { COMMUNITY_DATA } from "./community-data.js";
 import { CONFIG } from "./config.js";
 
 // ========== DOM ==========
@@ -54,13 +55,17 @@ let allLore = [];
 let selectedLeaders = new Set();
 let selectedLore = new Set();
 
-// Store both sources
+// Store all tier sources
 let personalLeaders = [];
 let personalLore = [];
 let dataLeaders = [];
 let dataLore = [];
 let customLeaders = [];
 let customLore = [];
+let community3pLeaders = [];
+let community3pLore = [];
+let community4pLeaders = [];
+let community4pLore = [];
 
 let draft = {
   numPlayers: 3,
@@ -257,6 +262,47 @@ function parseRankedData(rows, cards) {
     tier: assignTierByPercentile(loreStats, idx),
     value: 0,
     card: cardMap.get(normalizeText(s.name)) ?? null,
+  }));
+
+  assignValues(leaders);
+  assignValues(lore);
+  return { leaders, lore };
+}
+
+function parseCommunityTierData(playerCount, cards) {
+  const data = COMMUNITY_DATA[playerCount];
+  if (!data) return { leaders: [], lore: [] };
+
+  const cardMap = new Map();
+  for (const c of cards) cardMap.set(normalizeText(c.name), c);
+
+  function assignTierByPercentile(sorted, idx) {
+    const pct = (idx / sorted.length) * 100;
+    if (pct <= 10) return "S";
+    if (pct <= 30) return "A";
+    if (pct <= 70) return "B";
+    if (pct <= 90) return "C";
+    return "D";
+  }
+
+  // Sort by win rate descending
+  const leaderEntries = Object.entries(data.leaderWinrates)
+    .sort((a, b) => b[1] - a[1]);
+  const loreEntries = Object.entries(data.loreWinrates)
+    .sort((a, b) => b[1] - a[1]);
+
+  const leaders = leaderEntries.map(([name, winRate], idx) => ({
+    name,
+    tier: assignTierByPercentile(leaderEntries, idx),
+    value: 0,
+    card: cardMap.get(normalizeText(name)) ?? null,
+  }));
+
+  const lore = loreEntries.map(([name, winRate], idx) => ({
+    name,
+    tier: assignTierByPercentile(loreEntries, idx),
+    value: 0,
+    card: cardMap.get(normalizeText(name)) ?? null,
   }));
 
   assignValues(leaders);
@@ -1136,6 +1182,12 @@ function applyTierSource() {
   if (draft.tierSource === "data") {
     allLeaders = dataLeaders;
     allLore = dataLore;
+  } else if (draft.tierSource === "community3p") {
+    allLeaders = community3pLeaders;
+    allLore = community3pLore;
+  } else if (draft.tierSource === "community4p") {
+    allLeaders = community4pLeaders;
+    allLore = community4pLore;
   } else if (draft.tierSource === "custom") {
     allLeaders = customLeaders;
     allLore = customLore;
@@ -1235,8 +1287,18 @@ async function init() {
     dataLeaders = ranked.leaders;
     dataLore = ranked.lore;
 
+    // Parse community tier data (static, no fetch needed)
+    const comm3p = parseCommunityTierData("3p", cards);
+    community3pLeaders = comm3p.leaders;
+    community3pLore = comm3p.lore;
+
+    const comm4p = parseCommunityTierData("4p", cards);
+    community4pLeaders = comm4p.leaders;
+    community4pLore = comm4p.lore;
+
     if (personalLeaders.length === 0 && personalLore.length === 0 &&
-        dataLeaders.length === 0 && dataLore.length === 0) {
+        dataLeaders.length === 0 && dataLore.length === 0 &&
+        community4pLeaders.length === 0 && community4pLore.length === 0) {
       setStatus("No tier list data found.", { isError: true });
       return;
     }
