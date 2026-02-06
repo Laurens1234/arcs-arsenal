@@ -322,7 +322,7 @@ function initDownload() {
       alert("Failed to capture tier list. Try again.");
     } finally {
       el.downloadBtn.disabled = false;
-      el.downloadBtn.textContent = "\u2b07 Download PNG";
+      el.downloadBtn.textContent = "\u2b07 Download High Res PNG";
     }
   });
 }

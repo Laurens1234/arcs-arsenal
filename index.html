@@ -115,6 +115,34 @@
         color: var(--accent);
         background: var(--accent-glow);
       }
+
+      .home-card-about {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: default;
+      }
+
+      .home-card-about:hover {
+        transform: none;
+        border-color: var(--border);
+        box-shadow: var(--shadow-card);
+      }
+
+      .home-card-about a {
+        color: var(--accent);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+
+      .home-card-about a:hover {
+        color: var(--purple);
+        text-decoration: underline;
+      }
+
+      .home-card:nth-child(5) {
+        animation-delay: 0.4s;
+      }
     </style>
   </head>
   <body>
@@ -178,6 +206,14 @@
               <span class="home-card-arrow">Open Draft Helper →</span>
             </div>
           </a>
+          <div class="home-card home-card-about">
+            <div class="home-card-body">
+              <h2 class="home-card-title">About Me</h2>
+              <p class="home-card-desc">Made by Laurens. Feel free to reach out with feedback, suggestions, or just to chat about Arcs!</p>
+              <p class="home-card-desc">I am active in the <a href="https://discord.gg/74rsBjMR" target="_blank">Buried Giant Discord</a></p>
+              <p class="home-card-desc"><strong>My Discord:</strong> laurens0</p>
+            </div>
+          </div>
         </div>
       </div>
     </main>

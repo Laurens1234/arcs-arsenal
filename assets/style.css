@@ -143,6 +143,17 @@ body {
   font-size: 1.1rem;
 }
 
+.tagline a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.tagline a:hover {
+  color: var(--purple);
+  text-decoration: underline;
+}
+
 /* Theme Toggle */
 .theme-toggle {
   width: 44px;

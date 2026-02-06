@@ -1,15 +1,13 @@
 # Arcs Ranked
 
-A card statistics tracker for the board game Arcs, showing win rates and pick data for Leaders and Lore cards.
+Tools and data for the board game [Arcs](https://ledergames.com/products/arcs).
 
 ## Features
 
-- Win rate, wins, and pick statistics for all cards
-- Separate tabs for Leaders, Lore, and combined view
-- Data visualizations: scatter plots, histograms, tier lists
-- Card comparison mode
-- Dark/light theme toggle
-- Responsive design
+- **Data Rankings** — Win rates, picks, and stats for Leaders and Lore cards
+- **Generated Cards** — Custom leaders & lore built with the [Arcs Leader Generator](https://github.com/Laurens1234/Arcs-Leader-Generator)
+- **Tier List** — Personal card rankings from S to D
+- **Draft Simulator** — Practice drafting cards
 
 ## Data Sources
 
