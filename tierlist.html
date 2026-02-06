@@ -16,7 +16,7 @@
     <header class="header">
       <div class="container header-inner">
         <div>
-          <h1 class="logo">My Tier List</h1>
+          <a href="./index.html" style="text-decoration:none;color:inherit"><h1 class="logo">My Tier List</h1></a>
           <p class="tagline">Personal rankings for Arcs leaders &amp; lore</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
@@ -37,11 +37,55 @@
           <button class="tab" data-tab="lore">Lore</button>
         </div>
         <div class="controls">
-          <button id="downloadBtn" class="btn-compare">⬇ Download High Res PNG</button>
+          <button id="editBtn" class="btn-compare">Edit</button>
+          <button id="importBtn" class="btn-compare" style="display:none">📥 Import</button>
+          <button id="exportBtn" class="btn-compare" style="display:none">📤 Export</button>
+          <button id="downloadBtn" class="btn-compare">⬇ Download PNG</button>
           <a href="./index.html" class="btn-compare">← Home</a>
         </div>
       </div>
     </nav>
+
+    <!-- Import Modal -->
+    <div id="importModal" class="modal hidden">
+      <div class="modal-backdrop" id="importModalBackdrop"></div>
+      <div class="modal-content" style="max-width:560px">
+        <button class="modal-close" id="importModalClose">✕</button>
+        <div style="padding:24px">
+          <h2 style="margin:0 0 12px">Import Tier List</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px">Paste CSV text (Name,Tier format — empty line separates leaders from lore) or a published Google Sheets CSV URL.</p>
+          <div style="margin-bottom:12px">
+            <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">CSV URL (optional)</label>
+            <input id="importUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;box-sizing:border-box" />
+          </div>
+          <div style="margin-bottom:16px">
+            <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">Or paste CSV text</label>
+            <textarea id="importText" rows="10" placeholder="Name,Tier&#10;Tool-Priests,S&#10;Galactic Rifles,A&#10;...&#10;&#10;Name,Tier&#10;Admin Union,B&#10;..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="importCancelBtn" class="btn-compare">Cancel</button>
+            <button id="importConfirmBtn" class="btn-compare" style="border-color:var(--accent);color:var(--accent)">Import</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export Modal -->
+    <div id="exportModal" class="modal hidden">
+      <div class="modal-backdrop" id="exportModalBackdrop"></div>
+      <div class="modal-content" style="max-width:560px">
+        <button class="modal-close" id="exportModalClose">✕</button>
+        <div style="padding:24px">
+          <h2 style="margin:0 0 12px">Export Tier List</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px">Copy this CSV and share it. You can paste it into the Draft Helper's "Custom" tier source, or import it on this page.</p>
+          <textarea id="exportText" rows="14" readonly style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button id="exportCopyBtn" class="btn-compare" style="border-color:var(--accent);color:var(--accent)">📋 Copy</button>
+            <button id="exportCloseBtn" class="btn-compare">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <main class="main">
       <div class="container">
@@ -76,7 +120,7 @@
 
     <footer class="footer">
       <div class="container">
-        <p><a href="./ranked.html">Data Rankings</a> · <a href="./generated-cards.html">Generated Cards</a> · <a href="./index.html">Home</a></p>
+        <p><a href="./ranked.html">Data Rankings</a> · <a href="./custom-cards.html">Custom Cards</a> · <a href="./index.html">Home</a></p>
       </div>
     </footer>
 

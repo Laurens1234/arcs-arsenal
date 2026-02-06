@@ -1,5 +1,18 @@
 /* ===== Draft Helper Styles ===== */
 
+/* Custom Tier Input */
+.custom-tier-input {
+  margin-top: 8px;
+  padding: 12px;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.custom-tier-input.hidden {
+  display: none;
+}
+
 /* Explainer */
 .draft-explainer {
   background: var(--bg-card);

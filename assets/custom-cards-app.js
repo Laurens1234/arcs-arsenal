@@ -23,6 +23,8 @@ const el = {
 // ========== State ==========
 let allCards = [];
 let activeTab = "leaders";
+let selectMode = false;
+let selectedCards = new Set(); // stores card imageUrl as unique key
 
 // ========== Theme ==========
 function initTheme() {
@@ -128,7 +130,8 @@ function render() {
   el.cardGrid.innerHTML = cards
     .map(
       (card, i) => `
-    <div class="card" data-index="${i}" style="animation-delay: ${Math.min(i * 0.02, 0.22)}s">
+    <div class="card${selectMode ? ' selectable' : ''}${selectedCards.has(card.imageUrl) ? ' selected' : ''}" data-index="${i}" style="animation-delay: ${Math.min(i * 0.02, 0.22)}s">
+      ${selectMode ? `<div class="card-checkbox${selectedCards.has(card.imageUrl) ? ' checked' : ''}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div>` : ''}
       <div class="card-image">
         <img src="${card.imageUrl}" alt="${card.name}" loading="lazy" />
       </div>
@@ -139,14 +142,21 @@ function render() {
     )
     .join("");
 
-  // Attach click listeners for lightbox
+  // Attach click listeners
   el.cardGrid.querySelectorAll(".card").forEach((cardEl) => {
     cardEl.addEventListener("click", () => {
       const idx = parseInt(cardEl.dataset.index);
       const card = cards[idx];
-      if (card) openLightbox(card);
+      if (!card) return;
+      if (selectMode) {
+        toggleCardSelection(card, cardEl);
+      } else {
+        openLightbox(card);
+      }
     });
   });
+
+  updateSelectionCount();
 }
 
 // ========== Lightbox ==========
@@ -163,9 +173,56 @@ function closeLightbox() {
   document.body.style.overflow = "";
 }
 
+// ========== Selection ==========
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  document.getElementById("selectBtn").textContent = selectMode ? "✅ Done" : "☑ Select";
+  document.getElementById("selectActions").style.display = selectMode ? "inline-flex" : "none";
+  if (!selectMode) {
+    // Keep selections but exit visual mode
+  }
+  render();
+}
+
+function toggleCardSelection(card, cardEl) {
+  if (selectedCards.has(card.imageUrl)) {
+    selectedCards.delete(card.imageUrl);
+    cardEl.classList.remove("selected");
+    cardEl.querySelector(".card-checkbox")?.classList.remove("checked");
+  } else {
+    selectedCards.add(card.imageUrl);
+    cardEl.classList.add("selected");
+    cardEl.querySelector(".card-checkbox")?.classList.add("checked");
+  }
+  updateSelectionCount();
+}
+
+function selectAll() {
+  const cards = getFilteredCards();
+  for (const c of cards) selectedCards.add(c.imageUrl);
+  render();
+}
+
+function deselectAll() {
+  selectedCards.clear();
+  render();
+}
+
+function updateSelectionCount() {
+  const countEl = document.getElementById("selectionCount");
+  if (!countEl) return;
+  const n = selectedCards.size;
+  countEl.textContent = n > 0 ? `${n} selected` : "";
+  document.getElementById("printBtn").textContent = n > 0 ? `🖨 Print (${n})` : "🖨 Print All";
+}
+
 // ========== Print ==========
 function printCards() {
-  const cards = getFilteredCards();
+  // If cards are selected, print only those; otherwise print all visible
+  const visible = getFilteredCards();
+  const cards = selectedCards.size > 0
+    ? visible.filter((c) => selectedCards.has(c.imageUrl))
+    : visible;
   if (cards.length === 0) return;
 
   const container = document.getElementById("printContainer");
@@ -199,6 +256,11 @@ function init() {
 
   // Print
   document.getElementById("printBtn").addEventListener("click", printCards);
+
+  // Select mode
+  document.getElementById("selectBtn").addEventListener("click", toggleSelectMode);
+  document.getElementById("selectAllBtn").addEventListener("click", selectAll);
+  document.getElementById("deselectAllBtn").addEventListener("click", deselectAll);
 
   // Tabs
   el.tabs.forEach((tab) => {

@@ -16,7 +16,7 @@
     <header class="header">
       <div class="container header-inner">
         <div>
-          <h1 class="logo">Draft Helper</h1>
+          <a href="./index.html" style="text-decoration:none;color:inherit"><h1 class="logo">Draft Helper</h1></a>
           <p class="tagline">Optimize your Arcs leader &amp; lore picks</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
@@ -55,7 +55,7 @@
               <li><strong>Players</strong> - how many people are drafting (2–4).</li>
               <li><strong>Your Seat</strong> - which position you're sitting in. Draft order goes from the last player down (e.g. 3→2→1→3→2→1…).</li>
               <li><strong>Lore per Player</strong> - how many lore cards each player drafts.</li>
-              <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>Data</em> uses community win-rate data from the ranked page.</li>
+              <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>Data</em> uses community win-rate data from the ranked page; <em>Custom</em> lets you import your own tier list (export one from the <a href="./tierlist.html">Tier List</a> page).</li>
               <li><strong>Tier Scoring</strong> - <em>Varied</em> gives a small point spread (±0.25) within each tier based on sub-ranking; <em>Same</em> gives every card in a tier the exact same score.</li>
               <li><strong>Leader Weight</strong> - how much more a leader is worth relative to a lore card (e.g. 3× means a leader's score is tripled).</li>
               <li><strong>Draft Pool</strong> - select the exact leaders and lore cards that are available in your game. Use <em>Random</em> to fill or <em>Clear</em> to reset.</li>
@@ -65,12 +65,12 @@
               <li>Once you start, the tool shows whose turn it is and which cards are available.</li>
               <li>The card marked <strong>Best</strong> is the recommended pick based on <em>opportunity cost</em> - it picks the card you'd lose the most value on if you passed.</li>
               <li>Click a card to make that pick (for yourself or on behalf of other players to match what they chose in real life).</li>
-              <li><strong>Auto Draft</strong> completes the entire remaining draft using the AI recommendations.</li>
+              <li><strong>Auto Draft</strong> completes the entire remaining draft using the drafting algorithms recommendations.</li>
               <li><strong>Undo</strong> takes back the last pick. <strong>Reset</strong> undoes all picks back to the start.</li>
             </ul>
             <h4>Scoring</h4>
             <p>
-              Each tier has a base score - SS: 7, S: 6, A: 5, B: 4, C: 3, D: 1.
+              Each tier has a base score - SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1.
               With <em>Varied</em> scoring, cards get up to ±0.25 within their tier based on their sub-ranking - so the best card in A-tier scores slightly higher than the worst card in A-tier, even though they share the same tier. Use <em>Same</em> if you consider all cards within a tier to be equal.
               Leader scores are multiplied by the leader weight.
               The AI picks the card with the highest <strong>opportunity cost</strong>: the biggest drop-off between that card and the replacement you'd likely end up with if you skip it.
@@ -81,10 +81,10 @@
         <details class="draft-explainer">
           <summary class="draft-explainer-toggle">Draft Strategy</summary>
           <div class="draft-explainer-body">
-            <p>The most important thing in drafting in arcs is that leaders matter far more than lores.</strong> In my experience A single tier difference in leaders is roughly equivalent to a 3-tier difference in lore. Only prioritize a lore card over a leader if the available leaders are all close in strength.</p>
+            <p>The most important thing to realize about drafting in arcs is that leaders are far more impactful than lores.</strong> In my experience A single tier difference in leaders is roughly equivalent to a 3-tier difference in lore. Only prioritize a lore card over a leader if the available leaders are all close in strength.</p>
             <p>The tool does not keep these in mind, but in your real game draft you should also consider:</p>
             <ul>
-              <li>Draft for strength or flexibility first (this is what the tier lists and tool help with!), then for combos </li>
+              <li>Draft for raw strength and flexibility first (this is what the tier lists and tool help with!), then for combos </li>
               <li>Building starting locations</li>
               <li>Starting court</li>
               <li>Counters</li>
@@ -92,7 +92,7 @@
               <li>Denial of all of the above for other players</li>
             </ul>
             <p>
-              <strong>A note on player counts:</strong> Laurens's tier list is built around 3–4 player games, and the community data is from 4-player games. The 2-player mode is included for convenience - relative card strengths are similar enough to be useful, but take recommendations with a grain of salt at that count.
+              <strong>A note on player counts:</strong> Laurens's tier list is built around 3–4 player games, and the community data is from 4-player games. The 2-player mode is included for convenience. Relative card strengths are similar enough in different player count to be useful, but take recommendations with a grain of salt.
             </p>
           </div>
         </details>
@@ -144,6 +144,15 @@
               <div class="btn-group" id="tierSourceGroup">
                 <button class="btn-option active" data-value="personal">Laurens's</button>
                 <button class="btn-option" data-value="data">Data</button>
+                <button class="btn-option" data-value="custom">Custom</button>
+              </div>
+              <div id="customTierInput" class="custom-tier-input hidden">
+                <input id="customTierUrl" type="text" class="setup-input" placeholder="CSV URL (Google Sheets export link)" style="width:100%;margin-bottom:6px;box-sizing:border-box" />
+                <textarea id="customTierText" rows="4" placeholder="Or paste CSV text (Name,Tier — empty line separates leaders from lore)" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box;margin-bottom:6px"></textarea>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button id="customTierLoad" class="btn-sm" style="white-space:nowrap">Load Tier List</button>
+                  <span id="customTierStatus" style="font-size:0.8rem;color:var(--text-muted)"></span>
+                </div>
               </div>
             </div>
             <!-- Tier Scoring -->

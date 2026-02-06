@@ -15,6 +15,11 @@ const el = {
   leaderPoolSize: document.getElementById("leaderPoolSize"),
   lorePoolSize: document.getElementById("lorePoolSize"),
   tierSourceGroup: document.getElementById("tierSourceGroup"),
+  customTierInput: document.getElementById("customTierInput"),
+  customTierUrl: document.getElementById("customTierUrl"),
+  customTierText: document.getElementById("customTierText"),
+  customTierLoad: document.getElementById("customTierLoad"),
+  customTierStatus: document.getElementById("customTierStatus"),
   tierScoringGroup: document.getElementById("tierScoringGroup"),
   leaderWeight: document.getElementById("leaderWeight"),
   weightDisplay: document.getElementById("weightDisplay"),
@@ -54,6 +59,8 @@ let personalLeaders = [];
 let personalLore = [];
 let dataLeaders = [];
 let dataLore = [];
+let customLeaders = [];
+let customLore = [];
 
 let draft = {
   numPlayers: 3,
@@ -115,7 +122,7 @@ function toggleTheme() {
 }
 
 // ========== Scoring ==========
-const TIER_BASE = { SS: 7, S: 6, A: 5, B: 4, C: 3, D: 1 };
+const TIER_BASE = { SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1 };
 const TIER_ORDER = ["SS", "S", "A", "B", "C", "D"];
 
 function assignValues(entries) {
@@ -338,9 +345,13 @@ function initSetupUI() {
       el.tierSourceGroup.querySelector(".active").classList.remove("active");
       btn.classList.add("active");
       draft.tierSource = btn.dataset.value;
-      applyTierSource();
+      el.customTierInput.classList.toggle("hidden", draft.tierSource !== "custom");
+      if (draft.tierSource !== "custom") applyTierSource();
     });
   }
+
+  // Custom tier loading
+  el.customTierLoad.addEventListener("click", loadCustomTierData);
 
   // Tier scoring toggle
   for (const btn of el.tierScoringGroup.querySelectorAll(".btn-option")) {
@@ -1079,10 +1090,55 @@ function renderAvailableCards() {
   renderCardGroup(loreCards, "Lore");
 }
 
+async function loadCustomTierData() {
+  try {
+    el.customTierStatus.textContent = "Loading…";
+    el.customTierStatus.style.color = "var(--text-muted)";
+    let csvText = el.customTierText.value.trim();
+    const url = el.customTierUrl.value.trim();
+
+    if (url && !csvText) {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Failed to fetch URL (${res.status})`);
+      csvText = await res.text();
+    }
+
+    if (!csvText) {
+      el.customTierStatus.textContent = "Provide a URL or paste CSV.";
+      el.customTierStatus.style.color = "var(--red, #f87171)";
+      return;
+    }
+
+    const parsed = Papa.parse(csvText, { header: false, skipEmptyLines: false });
+    const rows = parsed.data ?? [];
+    const cards = await loadCards();
+    const result = parseTierData(rows, cards);
+
+    if (result.leaders.length === 0 && result.lore.length === 0) {
+      el.customTierStatus.textContent = "No valid tier data found.";
+      el.customTierStatus.style.color = "var(--red, #f87171)";
+      return;
+    }
+
+    customLeaders = result.leaders;
+    customLore = result.lore;
+    el.customTierStatus.textContent = `Loaded ${customLeaders.length} leaders, ${customLore.length} lore ✓`;
+    el.customTierStatus.style.color = "var(--accent)";
+    applyTierSource();
+  } catch (err) {
+    console.error(err);
+    el.customTierStatus.textContent = `Error: ${err.message}`;
+    el.customTierStatus.style.color = "var(--red, #f87171)";
+  }
+}
+
 function applyTierSource() {
   if (draft.tierSource === "data") {
     allLeaders = dataLeaders;
     allLore = dataLore;
+  } else if (draft.tierSource === "custom") {
+    allLeaders = customLeaders;
+    allLore = customLore;
   } else {
     allLeaders = personalLeaders;
     allLore = personalLore;

@@ -158,3 +158,111 @@
     font-size: 1.1rem;
   }
 }
+
+/* ===== Edit Mode ===== */
+.edit-mode .personal-tier-card {
+  cursor: grab;
+  user-select: none;
+}
+
+.edit-mode .personal-tier-card:active {
+  cursor: grabbing;
+}
+
+.edit-mode .personal-tier-cards {
+  min-height: 80px;
+  border: 2px dashed transparent;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.edit-mode .personal-tier-cards.drag-over {
+  border-color: var(--accent);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.personal-tier-card.dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.edit-active-indicator {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 700;
+  margin-left: 8px;
+  vertical-align: middle;
+  animation: pulse-edit 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-edit {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Tier remove button */
+.tier-remove-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 0.65rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.tier-remove-btn:hover {
+  opacity: 1;
+  background: rgba(220, 38, 38, 0.8);
+}
+
+/* Add tier bar */
+.add-tier-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+
+.add-tier-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #000;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.add-tier-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.add-tier-btn.tier-ss { background: linear-gradient(135deg, #ff7fff, #e060e0); }
+.add-tier-btn.tier-s  { background: linear-gradient(135deg, #ff7f7f, #e06060); }
+.add-tier-btn.tier-a  { background: linear-gradient(135deg, #ffbf7f, #e0a060); }
+.add-tier-btn.tier-b  { background: linear-gradient(135deg, #ffdf7f, #e0c060); }
+.add-tier-btn.tier-c  { background: linear-gradient(135deg, #ffff7f, #e0e060); }
+.add-tier-btn.tier-d  { background: linear-gradient(135deg, #bfff7f, #a0e060); }

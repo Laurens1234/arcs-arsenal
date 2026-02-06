@@ -1,4 +1,4 @@
-/* ========== Generated Cards Page Styles ========== */
+/* ========== Custom Cards Page Styles ========== */
 
 /* Type badge on cards */
 .gen-card-type-badge {
@@ -88,9 +88,58 @@
   color: var(--accent);
 }
 
-/* Generated cards page: simpler card-info (no stats) */
+/* Custom Cards page: simpler card-info (no stats) */
 .card-info {
   /* Inherits from main style.css */
+}
+
+/* ========== Selection Mode ========== */
+.card.selectable {
+  cursor: pointer;
+}
+
+.card.selectable:hover {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.card.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  box-shadow: 0 0 16px var(--accent-glow), 0 4px 16px rgba(0,0,0,0.3);
+}
+
+.card-checkbox {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid rgba(255,255,255,0.6);
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  pointer-events: none;
+}
+
+.card-checkbox svg {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.card-checkbox.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.card-checkbox.checked svg {
+  opacity: 1;
+  stroke: #fff;
 }
 
 /* ========== Print Container (hidden on screen) ========== */
