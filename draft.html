@@ -254,8 +254,17 @@
           </div>
 
           <div class="setup-actions">
-            <button id="startDraft" class="btn-primary" disabled>Start Draft</button>
-            <button id="simulateDrafts" class="btn-secondary" style="margin-left:12px">Simulate Drafts & Export CSV</button>
+              <button id="startDraft" class="btn-primary" disabled>Start Draft</button>
+              <button id="simulateDrafts" class="btn-secondary" style="margin-left:12px">Simulate Drafts & Export CSV</button>
+              <script>
+                // Hide Simulate Drafts button unless running locally
+                (function() {
+                  var simBtn = document.getElementById('simulateDrafts');
+                  if (simBtn && !(location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+                    simBtn.style.display = 'none';
+                  }
+                })();
+              </script>
           </div>
         </div>
 
