@@ -261,6 +261,33 @@
   gap: 6px;
 }
 
+.range-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.range-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 80px;
+}
+
+.range-group label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.range-display {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: center;
+  margin-top: 2px;
+}
+
 /* Pool Selection */
 .pool-section {
   background: var(--bg-card);
@@ -540,9 +567,21 @@
 
 .player-pick-details {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.player-pick .pick-header {
+  display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.player-pick .pick-points-line {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-weight: 500;
+  margin-left: 40px; /* Align with the name */
 }
 
 .player-pick .pick-type {
@@ -741,4 +780,91 @@
   .player-boards .draft-card {
     width: 147px;
   }
+}
+
+/* Custom Lore Settings */
+.custom-lore-settings {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.custom-lore-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+
+.custom-lore-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.custom-lore-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-solid);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  min-width: 0; /* Allow flex items to shrink */
+}
+
+.custom-lore-player label {
+  font-weight: 500;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.custom-lore-player input[type="range"] {
+  flex: 1;
+  margin: 0 12px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  accent-color: var(--accent);
+  min-width: 60px; /* Ensure minimum width */
+}
+
+.custom-lore-player input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.custom-lore-player input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.custom-lore-player .lore-count {
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Setup hints */
+.setup-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-style: italic;
 }

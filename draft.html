@@ -67,7 +67,7 @@
               <li><strong>Your Seat</strong> - which position you're sitting in. Draft order goes from the last player down (e.g. 3→2→1→3→2→1…).</li>
               <li><strong>Lore per Player</strong> - how many lore cards each player drafts.</li>
               <li><strong>Tier Source</strong> - <em>Laurens's</em> uses Laurens's personal tier rankings; <em>League</em> uses community win-rate data from the Arcs League ranked page; <em>Community 3P/4P</em> uses community draft data from 3-player or 4-player games; <em>Custom</em> lets you import your own tier list (export one from the <a href="./tierlist.html">Tier List</a> page).</li>
-              <li><strong>Tier Scoring</strong> - <em>Varied</em> gives a small point spread (±0.25) within each tier based on sub-ranking; <em>Same</em> gives every card in a tier the exact same score.</li>
+              <li><strong>Tier Scoring</strong> - <em>Varied</em> gives a small point spread (±0.3) within each tier based on sub-ranking; <em>Same</em> gives every card in a tier the exact same score.</li>
               <li><strong>Leader Weight</strong> - how much more a leader is worth relative to a lore card (e.g. 3× means a leader's score is tripled).</li>
               <li><strong>Draft Pool</strong> - select the exact leaders and lore cards that are available in your game. Use <em>Random</em> to fill or <em>Clear</em> to reset.</li>
             </ul>
@@ -81,8 +81,8 @@
             </ul>
             <h4>Scoring</h4>
             <p>
-              Each tier has a base score - SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1.
-              With <em>Varied</em> scoring, cards get up to ±0.25 within their tier based on their sub-ranking - so the best card in A-tier scores slightly higher than the worst card in A-tier, even though they share the same tier. Use <em>Same</em> if you consider all cards within a tier to be equal.
+              Each tier has a base score: SSS: 7, SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1, F: 0.
+              With <em>Varied</em> scoring, cards get up to ±0.3 within their tier based on their sub-ranking - so the best card in A-tier scores slightly higher than the worst card in A-tier, even though they share the same tier. Use <em>Same</em> if you consider all cards within a tier to be equal.
               Leader scores are multiplied by the leader weight.
               The AI picks the card with the highest <strong>opportunity cost</strong>: the biggest drop-off between that card and the replacement you'd likely end up with if you skip it.
             </p>
@@ -145,6 +145,16 @@
                 <button class="btn-option active" data-value="1">1</button>
                 <button class="btn-option" data-value="2">2</button>
                 <button class="btn-option" data-value="3">3</button>
+                <button class="btn-option" data-value="custom">Custom</button>
+              </div>
+              <div id="customLoreSettings" class="custom-lore-settings" style="display: none;">
+                <div class="custom-lore-header">
+                  <span>Player</span>
+                  <span>Lore Cards</span>
+                </div>
+                <div id="customLoreSliders" class="custom-lore-sliders">
+                  <!-- Sliders will be added here dynamically -->
+                </div>
               </div>
             </div>
             <!-- Leaders in Pool -->
@@ -228,6 +238,25 @@
                   <button class="btn-option" data-value="same">All Same</button>
                 </div>
               </div>
+              <div class="balanced-setting">
+                <label class="setup-label">Max Pt Spread</label>
+                <input id="acceptableSpread" type="number" class="setup-input" min="0.1" max="10" step="0.1" value="0.3" />
+              </div>
+              <div class="balanced-setting">
+                <label class="setup-label">Pt Range</label>
+                <div class="range-inputs">
+                  <div class="range-group">
+                    <label for="minScore">Min</label>
+                    <input id="minScore" type="range" class="setup-range" min="0" max="100" step="1" value="0.3" />
+                    <span id="minScoreDisplay" class="range-display">0.3</span>
+                  </div>
+                  <div class="range-group">
+                    <label for="maxScore">Max</label>
+                    <input id="maxScore" type="range" class="setup-range" min="1" max="100" step="1" value="100" />
+                    <span id="maxScoreDisplay" class="range-display">100</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -295,6 +324,7 @@
     <footer class="footer">
       <div class="container">
         <p><a href="./tierlist.html">My Tier List</a> · <a href="./ranked.html">Data Rankings</a> · <a href="./index.html">Home</a></p>
+        <button id="resetAllBtn" class="btn-sm" style="position: absolute; bottom: 20px; right: 24px; opacity: 0.8; font-size: 0.8rem;" title="Reset All (reloads page)">Reset All</button>
       </div>
     </footer>
 
