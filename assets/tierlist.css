@@ -1,5 +1,11 @@
 /* ===== Personal Tier List Styles ===== */
 
+.tabs {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
 .main-tabs {
   display: flex;
   gap: 4px;
