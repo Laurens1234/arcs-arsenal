@@ -1154,51 +1154,74 @@ function decodeTierListFromURL(encoded) {
   }
 }
 
-function updateMetaTagsForSharedTierList(tierData) {
-  // Count cards in each category
-  const leader3pCount = tierData.leaders3P.length;
-  const leader4pCount = tierData.leaders4P.length;
-  const loreCount = tierData.lore.length;
-  const basecourtCount = tierData.basecourt.length;
-  const totalCount = leader3pCount + leader4pCount + loreCount + basecourtCount;
-  
-  // Create description
-  let description = `Check out this custom tier list for Arcs with ${totalCount} ranked cards`;
-  if (leader3pCount > 0) description += `, ${leader3pCount} 3P leaders`;
-  if (leader4pCount > 0) description += `, ${leader4pCount} 4P leaders`;
-  if (loreCount > 0) description += `, ${loreCount} lore cards`;
-  if (basecourtCount > 0) description += `, ${basecourtCount} base court cards`;
-  description += ".";
-  
-  // Update title
-  document.title = "Shared Arcs Tier List";
-  
-  // Update meta description
-  const descriptionMeta = document.querySelector('meta[name="description"]');
-  if (descriptionMeta) {
-    descriptionMeta.content = description;
-  }
-  
-  // Update Open Graph tags
-  const ogTitle = document.querySelector('meta[property="og:title"]');
-  if (ogTitle) {
-    ogTitle.content = "Shared Arcs Tier List";
-  }
-  
-  const ogDescription = document.querySelector('meta[property="og:description"]');
-  if (ogDescription) {
-    ogDescription.content = description;
-  }
-  
-  // Update Twitter tags
-  const twitterTitle = document.querySelector('meta[name="twitter:title"]');
-  if (twitterTitle) {
-    twitterTitle.content = "Shared Arcs Tier List";
-  }
-  
-  const twitterDescription = document.querySelector('meta[name="twitter:description"]');
-  if (twitterDescription) {
-    twitterDescription.content = description;
+function updateMetaTagsForSharedTierList(encoded) {
+  // Parse encoded string to get counts without needing card data
+  try {
+    const padded = encoded.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - encoded.length % 4) % 4);
+    const data = atob(padded);
+    const sections = data.split('|');
+    
+    let leader3pCount = 0;
+    let leader4pCount = 0;
+    let loreCount = 0;
+    let basecourtCount = 0;
+    
+    for (const section of sections) {
+      const [sectionName, entriesStr] = section.split(':');
+      if (!entriesStr) continue;
+      
+      const count = Math.floor(entriesStr.length / 3); // Each entry is 3 chars
+      
+      switch (sectionName) {
+        case '3': leader3pCount = count; break;
+        case '4': leader4pCount = count; break;
+        case 'L': loreCount = count; break;
+        case 'B': basecourtCount = count; break;
+      }
+    }
+    
+    const totalCount = leader3pCount + leader4pCount + loreCount + basecourtCount;
+    
+    // Create description
+    let description = `Check out this custom tier list for Arcs with ${totalCount} ranked cards`;
+    if (leader3pCount > 0) description += `, ${leader3pCount} 3P leaders`;
+    if (leader4pCount > 0) description += `, ${leader4pCount} 4P leaders`;
+    if (loreCount > 0) description += `, ${loreCount} lore cards`;
+    if (basecourtCount > 0) description += `, ${basecourtCount} base court cards`;
+    description += ".";
+    
+    // Update title
+    document.title = "Shared Arcs Tier List";
+    
+    // Update meta description
+    const descriptionMeta = document.querySelector('meta[name="description"]');
+    if (descriptionMeta) {
+      descriptionMeta.content = description;
+    }
+    
+    // Update Open Graph tags
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) {
+      ogTitle.content = "Shared Arcs Tier List";
+    }
+    
+    const ogDescription = document.querySelector('meta[property="og:description"]');
+    if (ogDescription) {
+      ogDescription.content = description;
+    }
+    
+    // Update Twitter tags
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twitterTitle) {
+      twitterTitle.content = "Shared Arcs Tier List";
+    }
+    
+    const twitterDescription = document.querySelector('meta[name="twitter:description"]');
+    if (twitterDescription) {
+      twitterDescription.content = description;
+    }
+  } catch (err) {
+    console.error('Failed to parse tier list for meta tags:', err);
   }
 }
 
@@ -1268,6 +1291,11 @@ async function init() {
     const urlParams = new URLSearchParams(window.location.search);
     const tierlistParam = urlParams.get('tierlist');
     
+    if (tierlistParam) {
+      // Update meta tags immediately for link previews
+      updateMetaTagsForSharedTierList(tierlistParam);
+    }
+    
     let tierData;
     if (tierlistParam) {
       // Load tier list from URL
@@ -1276,8 +1304,6 @@ async function init() {
         setStatus("Loaded tier list from URL");
         // Show share button for shared tier lists
         el.shareBtn.style.display = "";
-        // Update meta tags for link previews
-        updateMetaTagsForSharedTierList(tierData);
       } else {
         setStatus("Invalid tier list in URL, loading default", { isError: true });
         tierData = await loadDefaultTierList();
