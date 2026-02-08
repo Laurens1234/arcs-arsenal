@@ -6,8 +6,8 @@ Tools and data for the board game [Arcs](https://ledergames.com/products/arcs).
 
 - **Data Arsenal** Win rates, picks, and stats for Leaders and Lore cards
 - **Custom Cards** Custom leaders & lore built with the [Arcs Leader Generator](https://github.com/Laurens1234/Arcs-Leader-Generator)
-- **Tier List** Personal card rankings from S to D
-- **Draft Simulator** Practice drafting cards
+- **Tier List** Personal card rankings
+- **Draft helper** 
 
 ## Data Sources
 
