@@ -1,5 +1,39 @@
 /* ===== Personal Tier List Styles ===== */
 
+.main-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.sub-tab {
+  padding: 10px 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: calc(var(--radius) - 4px);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sub-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sub-tab.active {
+  background: linear-gradient(135deg, var(--accent), #3db9b0);
+  color: var(--bg);
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
 .personal-tier-list {
   display: flex;
   flex-direction: column;
@@ -31,6 +65,10 @@
   user-select: none;
 }
 
+.personal-tier-label.tier-sss {
+  background: linear-gradient(180deg, #9f7fff, #8060e0);
+}
+
 .personal-tier-label.tier-ss {
   background: linear-gradient(180deg, #ff7fff, #e060e0);
 }
@@ -53,6 +91,10 @@
 
 .personal-tier-label.tier-d {
   background: linear-gradient(180deg, #bfff7f, #a0e060);
+}
+
+.personal-tier-label.tier-f {
+  background: linear-gradient(180deg, #7f7f7f, #606060);
 }
 
 .personal-tier-cards {

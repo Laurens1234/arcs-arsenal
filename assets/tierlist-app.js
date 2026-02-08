@@ -6,13 +6,17 @@ import { CONFIG } from "./config.js";
 // ========== DOM ==========
 const el = {
   status: document.getElementById("status"),
-  leadersTierList: document.getElementById("leadersTierList"),
+  leaders3pTierList: document.getElementById("leaders3pTierList"),
+  leaders4pTierList: document.getElementById("leaders4pTierList"),
   loreTierList: document.getElementById("loreTierList"),
   basecourtTierList: document.getElementById("basecourtTierList"),
-  leadersSection: document.getElementById("leadersSection"),
+  leaders3pSection: document.getElementById("leaders3pSection"),
+  leaders4pSection: document.getElementById("leaders4pSection"),
   loreSection: document.getElementById("loreSection"),
   basecourtSection: document.getElementById("basecourtSection"),
   tabs: document.querySelectorAll(".tab"),
+  subTabs: document.querySelectorAll(".sub-tab"),
+  leaderSubTabs: document.getElementById("leaderSubTabs"),
   themeToggle: document.getElementById("themeToggle"),
   downloadBtn: document.getElementById("downloadBtn"),
   editBtn: document.getElementById("editBtn"),
@@ -44,11 +48,13 @@ const el = {
 
 // ========== State ==========
 let editMode = false;
-let leaderEntries = []; // current leader entries (mutable in edit mode)
+let leaderEntries3P = []; // current 3P leader entries (mutable in edit mode)
+let leaderEntries4P = []; // current 4P leader entries (mutable in edit mode)
 let loreEntries = [];   // current lore entries (mutable in edit mode)
 let basecourtEntries = []; // current base court entries (mutable in edit mode)
 let allCards = [];       // loaded card data
 let hiddenTiers = new Set(); // tiers the user has removed
+let currentLeaderTab = '3p'; // current leader sub-tab
 
 // Touch drag and drop state
 let touchDraggedElement = null;
@@ -169,12 +175,13 @@ async function loadTierListSheet() {
 
 function parseTierListSheet(rows, cards) {
   // Sheet format: Name | Tier  OR  "Name,Tier" in single column
-  // Empty rows separate leaders, lore, and base court
+  // Empty rows separate 3P leaders, 4P leaders, lore, and base court
   // First row is header (Name, Tier) or (Name,Tier)
-  const leaders = [];
+  const leaders3P = [];
+  const leaders4P = [];
   const lore = [];
   const basecourt = [];
-  let section = 0; // 0 = leaders, 1 = lore, 2 = base court
+  let section = 0; // 0 = 3P leaders, 1 = 4P leaders, 2 = lore, 3 = base court
   let headerSkipped = false;
 
   // Build a lookup map: normalized name → card
@@ -214,7 +221,7 @@ function parseTierListSheet(rows, cards) {
     if (!name && !tier) {
       if (headerSkipped) {
         section++;
-        if (section > 2) break; // Stop after base court section
+        if (section > 3) break; // Stop after base court section
       }
       continue;
     }
@@ -229,19 +236,21 @@ function parseTierListSheet(rows, cards) {
     };
 
     if (section === 0) {
-      leaders.push(entry);
+      leaders3P.push(entry);
     } else if (section === 1) {
-      lore.push(entry);
+      leaders4P.push(entry);
     } else if (section === 2) {
+      lore.push(entry);
+    } else if (section === 3) {
       basecourt.push(entry);
     }
   }
 
-  return { leaders, lore, basecourt };
+  return { leaders3P, leaders4P, lore, basecourt };
 }
 
 // ========== Rendering ==========
-const TIER_ORDER = ["SS", "S", "A", "B", "C", "D"];
+const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F"];
 
 function buildTierListHTML(entries, container, type) {
   // Group by tier
@@ -259,7 +268,7 @@ function buildTierListHTML(entries, container, type) {
   for (const tier of TIER_ORDER) {
     if (hiddenTiers.has(tier)) continue;
     const items = grouped.get(tier);
-    if (items.length === 0 && tier === "SS" && !editMode) continue;
+    if (items.length === 0 && !editMode) continue;
 
     const row = document.createElement("div");
     row.className = "personal-tier-row";
@@ -588,7 +597,7 @@ function createCardElement(entry, type) {
 }
 
 function moveCard(name, newTier, type, insertBefore = null) {
-  const entries = type === "leaders" ? leaderEntries : type === "lore" ? loreEntries : basecourtEntries;
+  const entries = type === "leaders" ? (currentLeaderTab === '3p' ? leaderEntries3P : leaderEntries4P) : type === "lore" ? loreEntries : basecourtEntries;
   const entryIndex = entries.findIndex((e) => e.name === name);
   if (entryIndex === -1) return;
   
@@ -653,7 +662,10 @@ function removeTier(tier) {
   if (!target) target = visibleTiers[visibleTiers.length - 1];
 
   // Move all cards from this tier to the target
-  for (const e of leaderEntries) {
+  for (const e of leaderEntries3P) {
+    if (e.tier === tier) e.tier = target;
+  }
+  for (const e of leaderEntries4P) {
     if (e.tier === tier) e.tier = target;
   }
   for (const e of loreEntries) {
@@ -668,7 +680,8 @@ function removeTier(tier) {
 }
 
 function rebuildCurrentView() {
-  buildTierListHTML(leaderEntries, el.leadersTierList, "leaders");
+  buildTierListHTML(leaderEntries3P, el.leaders3pTierList, "leaders");
+  buildTierListHTML(leaderEntries4P, el.leaders4pTierList, "leaders");
   buildTierListHTML(loreEntries, el.loreTierList, "lore");
   buildTierListHTML(basecourtEntries, el.basecourtTierList, "basecourt");
 }
@@ -684,17 +697,27 @@ function toggleEditMode() {
 }
 
 // ========== Export ==========
-function entriesToCsv(leaders, lore, basecourt) {
-  const TIER_ORDER = ["SS", "S", "A", "B", "C", "D"];
+function entriesToCsv(leaders3P, leaders4P, lore, basecourt) {
+  const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F"];
   
-  // Group leaders by tier
-  const leaderGroups = new Map();
+  // Group 3P leaders by tier
+  const leader3PGroups = new Map();
   for (const tier of TIER_ORDER) {
-    leaderGroups.set(tier, []);
+    leader3PGroups.set(tier, []);
   }
-  for (const entry of leaders) {
+  for (const entry of leaders3P) {
     const t = TIER_ORDER.includes(entry.tier) ? entry.tier : "D";
-    leaderGroups.get(t).push(entry);
+    leader3PGroups.get(t).push(entry);
+  }
+
+  // Group 4P leaders by tier
+  const leader4PGroups = new Map();
+  for (const tier of TIER_ORDER) {
+    leader4PGroups.set(tier, []);
+  }
+  for (const entry of leaders4P) {
+    const t = TIER_ORDER.includes(entry.tier) ? entry.tier : "D";
+    leader4PGroups.get(t).push(entry);
   }
   
   // Group lore by tier
@@ -719,9 +742,19 @@ function entriesToCsv(leaders, lore, basecourt) {
   
   let csv = "Name,Tier\n";
   
-  // Export leaders by tier order
+  // Export 3P leaders by tier order
   for (const tier of TIER_ORDER) {
-    const entries = leaderGroups.get(tier);
+    const entries = leader3PGroups.get(tier);
+    for (const entry of entries) {
+      csv += `${entry.name},${entry.tier}\n`;
+    }
+  }
+  
+  csv += "\n";
+  
+  // Export 4P leaders by tier order
+  for (const tier of TIER_ORDER) {
+    const entries = leader4PGroups.get(tier);
     for (const entry of entries) {
       csv += `${entry.name},${entry.tier}\n`;
     }
@@ -786,7 +819,7 @@ function fallbackCopyTextToClipboard(text) {
 }
 
 function openExportModal() {
-  el.exportText.value = entriesToCsv(leaderEntries, loreEntries, basecourtEntries);
+  el.exportText.value = entriesToCsv(leaderEntries3P, leaderEntries4P, loreEntries, basecourtEntries);
   el.exportModal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -831,12 +864,13 @@ async function doImport() {
     for (const c of allCards) cardMap.set(normalizeText(c.name), c);
     const result = parseTierListSheet(rows, allCards);
 
-    if (result.leaders.length === 0 && result.lore.length === 0 && result.basecourt.length === 0) {
+    if (result.leaders3P.length === 0 && result.leaders4P.length === 0 && result.lore.length === 0 && result.basecourt.length === 0) {
       alert("No valid tier data found in the input.");
       return;
     }
 
-    leaderEntries = result.leaders;
+    leaderEntries3P = result.leaders3P;
+    leaderEntries4P = result.leaders4P;
     loreEntries = result.lore;
     basecourtEntries = result.basecourt;
     rebuildCurrentView();
@@ -866,7 +900,8 @@ function closeModal() {
 // ========== Tabs ==========
 function initTabs() {
   const sections = {
-    leaders: el.leadersSection,
+    leaders3p: el.leaders3pSection,
+    leaders4p: el.leaders4pSection,
     lore: el.loreSection,
     basecourt: el.basecourtSection,
   };
@@ -876,25 +911,61 @@ function initTabs() {
       const target = tab.dataset.tab;
       el.tabs.forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
+      
+      // Show/hide sub-tabs
+      if (target === 'leaders') {
+        el.leaderSubTabs.style.display = '';
+        // Show the current leader sub-tab
+        const currentSub = currentLeaderTab === '3p' ? 'leaders3p' : 'leaders4p';
+        Object.entries(sections).forEach(([key, section]) => {
+          section.classList.toggle("hidden", key !== currentSub);
+        });
+      } else {
+        el.leaderSubTabs.style.display = 'none';
+        Object.entries(sections).forEach(([key, section]) => {
+          section.classList.toggle("hidden", key !== target);
+        });
+      }
+    });
+  });
+
+  // Sub-tab switching
+  el.subTabs.forEach((subTab) => {
+    subTab.addEventListener("click", () => {
+      const target = subTab.dataset.subtab;
+      el.subTabs.forEach((t) => t.classList.remove("active"));
+      subTab.classList.add("active");
+      currentLeaderTab = target;
+      
+      const sectionKey = target === '3p' ? 'leaders3p' : 'leaders4p';
       Object.entries(sections).forEach(([key, section]) => {
-        section.classList.toggle("hidden", key !== target);
+        section.classList.toggle("hidden", key !== sectionKey);
       });
     });
   });
+
+  // Initialize sub-tabs visibility
+  if (el.tabs[0].classList.contains('active') && el.tabs[0].dataset.tab === 'leaders') {
+    el.leaderSubTabs.style.display = '';
+  }
 }
 
 // ========== Download PNG ==========
 function initDownload() {
   el.downloadBtn.addEventListener("click", async () => {
     // Determine which section is visible
-    const isLeaders = !el.leadersSection.classList.contains("hidden");
+    const isLeaders3P = !el.leaders3pSection.classList.contains("hidden");
+    const isLeaders4P = !el.leaders4pSection.classList.contains("hidden");
     const isLore = !el.loreSection.classList.contains("hidden");
     const isBaseCourt = !el.basecourtSection.classList.contains("hidden");
     
     let target, label;
-    if (isLeaders) {
-      target = el.leadersTierList;
-      label = "leaders";
+    if (isLeaders3P) {
+      target = el.leaders3pTierList;
+      label = "leaders-3p";
+    } else if (isLeaders4P) {
+      target = el.leaders4pTierList;
+      label = "leaders-4p";
     } else if (isLore) {
       target = el.loreTierList;
       label = "lore";
@@ -1003,18 +1074,20 @@ async function init() {
     setStatus("Loading cards & tier list…");
     const [cards, rows] = await Promise.all([loadCards(), loadTierListSheet()]);
     allCards = cards;
-    const { leaders, lore, basecourt } = parseTierListSheet(rows, cards);
+    const { leaders3P, leaders4P, lore, basecourt } = parseTierListSheet(rows, cards);
 
-    if (leaders.length === 0 && lore.length === 0 && basecourt.length === 0) {
+    if (leaders3P.length === 0 && leaders4P.length === 0 && lore.length === 0 && basecourt.length === 0) {
       setStatus("No tier list data found. Check the spreadsheet.", { isError: true });
       return;
     }
 
-    leaderEntries = leaders;
+    leaderEntries3P = leaders3P;
+    leaderEntries4P = leaders4P;
     loreEntries = lore;
     basecourtEntries = basecourt;
 
-    buildTierListHTML(leaderEntries, el.leadersTierList, "leaders");
+    buildTierListHTML(leaderEntries3P, el.leaders3pTierList, "leaders");
+    buildTierListHTML(leaderEntries4P, el.leaders4pTierList, "leaders");
     buildTierListHTML(loreEntries, el.loreTierList, "lore");
     buildTierListHTML(basecourtEntries, el.basecourtTierList, "basecourt");
 

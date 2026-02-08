@@ -44,9 +44,15 @@
     <nav class="nav">
       <div class="container">
         <div class="tabs">
-          <button class="tab active" data-tab="leaders">Leaders</button>
-          <button class="tab" data-tab="lore">Lore</button>
-          <button class="tab" data-tab="basecourt">Base Court</button>
+          <div class="main-tabs">
+            <button class="tab active" data-tab="leaders">Leaders</button>
+            <button class="tab" data-tab="lore">Lore</button>
+            <button class="tab" data-tab="basecourt">Base Court</button>
+          </div>
+          <div id="leaderSubTabs" class="sub-tabs" style="display:none">
+            <button class="sub-tab active" data-subtab="3p">3P</button>
+            <button class="sub-tab" data-subtab="4p">4P</button>
+          </div>
         </div>
         <div class="controls">
           <button id="editBtn" class="btn-compare">Edit</button>
@@ -65,14 +71,14 @@
         <button class="modal-close" id="importModalClose">✕</button>
         <div style="padding:24px">
           <h2 style="margin:0 0 12px">Import Tier List</h2>
-          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px">Paste CSV text (Name,Tier format — empty line separates leaders from lore) or a published Google Sheets CSV URL.</p>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px">Paste CSV text (Name,Tier format — empty line separates 3P leaders, 4P leaders, and lore) or a published Google Sheets CSV URL.</p>
           <div style="margin-bottom:12px">
             <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">CSV URL (optional)</label>
             <input id="importUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/.../export?format=csv" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;box-sizing:border-box" />
           </div>
           <div style="margin-bottom:16px">
             <label style="font-size:0.85rem;font-weight:600;display:block;margin-bottom:4px">Or paste CSV text</label>
-            <textarea id="importText" rows="10" placeholder="Name,Tier&#10;Tool-Priests,S&#10;Galactic Rifles,A&#10;...&#10;&#10;Name,Tier&#10;Admin Union,B&#10;..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>
+            <textarea id="importText" rows="10" placeholder="Name,Tier&#10;Tool-Priests,S&#10;Galactic Rifles,A&#10;&#10;Name,Tier&#10;Admin Union,B&#10;...&#10;&#10;Name,Tier&#10;Tool-Priests,S&#10;..." style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem;resize:vertical;box-sizing:border-box"></textarea>
           </div>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button id="importCancelBtn" class="btn-compare">Cancel</button>
@@ -103,8 +109,12 @@
       <div class="container">
         <div id="status" class="status">Loading tier list…</div>
 
-        <section id="leadersSection" class="section">
-          <div id="leadersTierList" class="personal-tier-list"></div>
+        <section id="leaders3pSection" class="section">
+          <div id="leaders3pTierList" class="personal-tier-list"></div>
+        </section>
+
+        <section id="leaders4pSection" class="section hidden">
+          <div id="leaders4pTierList" class="personal-tier-list"></div>
         </section>
 
         <section id="loreSection" class="section hidden">
