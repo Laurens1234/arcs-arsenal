@@ -16,4 +16,4 @@ Tools and data for the board game [Arcs](https://ledergames.com/products/arcs).
 
 ## Live Site
 
-https://laurens1234.github.io/arcs-arsenal/
+https://laurens1234.github.io/Arcs-Arsenal/
