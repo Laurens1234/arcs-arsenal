@@ -1225,6 +1225,20 @@ function updateMetaTagsForSharedTierList(encoded) {
   }
 }
 
+function shareTierList() {
+  const encoded = encodeTierListForURL(leaderEntries3P, leaderEntries4P, loreEntries, basecourtEntries);
+  const url = new URL(window.location);
+  url.searchParams.set('tierlist', encoded);
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(url.toString()).then(() => {
+    alert('Shareable link copied to clipboard!');
+  }).catch(() => {
+    // Fallback: show the URL
+    alert(`Shareable link:\n${url.toString()}`);
+  });
+}
+
 async function loadDefaultTierList() {
   const rows = await loadTierListSheet();
   return parseTierListSheet(rows, allCards);
