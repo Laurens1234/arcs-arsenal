@@ -1129,10 +1129,15 @@ function switchDataSource(source, playerCount) {
       el.pageTagline.textContent = "Leaders & Lore win rates from Arcs League games";
     }
   } else {
-    const Community = buildCommunityCards(appState.yamlCards, appState.playerCount);
-    leaders = Community.leaders;
-    lore = Community.lore;
-    games = Community.games;
+    const { stats, games } = buildCommunityStats(appState.playerCount);
+    const communityCards = appState.yamlCards
+      .map((yamlCard) => {
+        const stat = stats.find((s) => s.name === yamlCard.name);
+        return stat ? { ...yamlCard, stats: stat } : null;
+      })
+      .filter(Boolean);
+    leaders = communityCards.filter((c) => c.stats.type === "Leader");
+    lore = communityCards.filter((c) => c.stats.type === "Lore");
     if (el.dataSourceLabel) {
       const label = appState.playerCount === "3p" ? "3-player" : "4-player";
       el.dataSourceLabel.innerHTML = `Community ${label} data from <a href="https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates" target="_blank">BGG</a>`;
