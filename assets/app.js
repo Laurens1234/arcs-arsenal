@@ -25,6 +25,7 @@ const el = {
   modalText: document.getElementById("modalText"),
   modalClose: document.querySelector(".modal-close"),
   modalBackdrop: document.querySelector(".modal-backdrop"),
+  modalShareBtn: document.getElementById("modalShareBtn"),
   // Compare
   compareBtn: document.getElementById("compareBtn"),
   comparePanel: document.getElementById("comparePanel"),
@@ -75,6 +76,7 @@ let appState = {
   playerCount: "4p",         // "3p" | "4p" (for Community)
   yamlCards: [],              // loaded card definitions
   leagueCards: null,          // { leaders, lore } from league data
+  currentModalCard: null,     // current card in modal
 };
 
 // ========== Utilities ==========
@@ -924,7 +926,24 @@ function renderCards(cards, container, metric, query) {
 
 // ========== Modal ==========
 function openModal(card) {
+  appState.currentModalCard = card;
   const imgUrl = getImageUrl(card);
+  
+  // Update page title and meta tags for sharing
+  document.title = `${card.name} - Arcs Arsenal`;
+  const ogTitle = document.querySelector('meta[property="og:title"]');
+  if (ogTitle) ogTitle.setAttribute('content', `${card.name} - Arcs Arsenal`);
+  const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+  if (twitterTitle) twitterTitle.setAttribute('content', `${card.name} - Arcs Arsenal`);
+  const desc = `View stats for ${card.name} in Arcs. Win rate: ${card.stats?.winRate?.toFixed(1)}%`;
+  const ogDesc = document.querySelector('meta[property="og:description"]');
+  if (ogDesc) ogDesc.setAttribute('content', desc);
+  const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+  if (twitterDesc) twitterDesc.setAttribute('content', desc);
+  const ogImage = document.querySelector('meta[property="og:image"]');
+  if (ogImage && imgUrl) ogImage.setAttribute('content', imgUrl);
+  const twitterImage = document.querySelector('meta[name="twitter:image"]');
+  if (twitterImage && imgUrl) twitterImage.setAttribute('content', imgUrl);
   
   el.modalImg.src = imgUrl || "";
   el.modalImg.alt = card.name;
@@ -972,6 +991,32 @@ function openModal(card) {
 function closeModal() {
   el.modal.classList.add("hidden");
   document.body.style.overflow = "";
+  
+  // Reset page title and meta tags
+  document.title = "Arcs Arsenal - Rankings";
+  const ogTitle = document.querySelector('meta[property="og:title"]');
+  if (ogTitle) ogTitle.setAttribute('content', 'Arcs Arsenal - Rankings');
+  const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+  if (twitterTitle) twitterTitle.setAttribute('content', 'Arcs Arsenal - Rankings');
+  const desc = "Arcs cards ranked with win rates and pick statistics.";
+  const ogDesc = document.querySelector('meta[property="og:description"]');
+  if (ogDesc) ogDesc.setAttribute('content', desc);
+  const twitterDesc = document.querySelector('meta[name="twitter:description"]');
+  if (twitterDesc) twitterDesc.setAttribute('content', desc);
+  const ogImage = document.querySelector('meta[property="og:image"]');
+  if (ogImage) ogImage.setAttribute('content', './favicon.svg');
+  const twitterImage = document.querySelector('meta[name="twitter:image"]');
+  if (twitterImage) twitterImage.setAttribute('content', './favicon.svg');
+}
+
+function shareCard(card) {
+  const url = new URL(window.location);
+  url.searchParams.set('card', encodeURIComponent(card.name));
+  navigator.clipboard.writeText(url.toString()).then(() => {
+    alert('Shareable link copied to clipboard!');
+  }).catch(() => {
+    alert(`Shareable link:\n${url.toString()}`);
+  });
 }
 
 // ========== Compare Mode ==========
@@ -1095,6 +1140,9 @@ function wireUi(state) {
   // Modal
   el.modalClose.addEventListener("click", closeModal);
   el.modalBackdrop.addEventListener("click", closeModal);
+  el.modalShareBtn.addEventListener("click", () => {
+    if (appState.currentModalCard) shareCard(appState.currentModalCard);
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeModal();
   });
@@ -1245,6 +1293,16 @@ async function main() {
     
     const refresh = wireUi({ leaders, lore });
     refresh();
+
+    // Check for card URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const cardName = urlParams.get('card');
+    if (cardName) {
+      const card = appState.allCards.find(c => c.name === decodeURIComponent(cardName));
+      if (card) {
+        openModal(card);
+      }
+    }
 
     // Wire up data source toggle
     wireDataSourceToggle();
