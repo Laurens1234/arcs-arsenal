@@ -123,14 +123,25 @@ function toggleTheme() {
 
 // ========== Data Loading ==========
 async function fetchText(url) {
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Fetch failed ${res.status}: ${url}`);
-  const text = await res.text();
-  
-  if (text.includes("accounts.google.com") && text.includes("Sign in")) {
-    throw new Error("Google requires login. Make the sheet public.");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) throw new Error(`Fetch failed ${res.status}: ${url}`);
+    const text = await res.text();
+    
+    if (text.includes("accounts.google.com") && text.includes("Sign in")) {
+      throw new Error("Google requires login. Make the sheet public.");
+    }
+    return text;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error(`Fetch timed out: ${url}`);
+    }
+    throw err;
   }
-  return text;
 }
 
 async function loadCards() {
