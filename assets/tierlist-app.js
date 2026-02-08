@@ -54,6 +54,7 @@ let loreEntries = [];   // current lore entries (mutable in edit mode)
 let basecourtEntries = []; // current base court entries (mutable in edit mode)
 let allCards = [];       // loaded card data
 let hiddenTiers = new Set(); // tiers the user has removed
+let visibleEmptyTiers = new Set(); // empty tiers that should be shown as rows
 let currentLeaderTab = '3p'; // current leader sub-tab
 
 // Touch drag and drop state
@@ -269,6 +270,14 @@ function buildTierListHTML(entries, container, type) {
     if (hiddenTiers.has(tier)) continue;
     const items = grouped.get(tier);
     if (items.length === 0 && !editMode) continue;
+    // In edit mode, show tiers with cards OR tiers marked as visible even when empty
+    if (items.length === 0 && editMode && !visibleEmptyTiers.has(tier)) continue;
+    
+    // If this empty visible tier somehow got cards, keep it visible
+    // If this tier became empty again, remove it from visible set so it becomes an add button
+    if (editMode && items.length === 0 && visibleEmptyTiers.has(tier)) {
+      // This is a visible empty tier, show it
+    }
 
     const row = document.createElement("div");
     row.className = "personal-tier-row";
@@ -367,8 +376,8 @@ function buildTierListHTML(entries, container, type) {
     container.appendChild(row);
   }
 
-  // In edit mode, show add-tier bar for hidden tiers at the bottom
-  if (editMode && hiddenTiers.size > 0) {
+  // In edit mode, show add-tier bar for hidden tiers and empty tiers
+  if (editMode) {
     const addBar = document.createElement("div");
     addBar.className = "add-tier-bar";
     const lbl = document.createElement("span");
@@ -377,17 +386,35 @@ function buildTierListHTML(entries, container, type) {
     lbl.style.color = "var(--text-muted)";
     lbl.style.marginRight = "8px";
     addBar.appendChild(lbl);
+    
+    // Add buttons for hidden tiers
     for (const tier of TIER_ORDER) {
-      if (!hiddenTiers.has(tier)) continue;
-      const btn = document.createElement("button");
-      btn.className = `add-tier-btn tier-${tier.toLowerCase()}`;
-      btn.textContent = `+ ${tier}`;
-      btn.addEventListener("click", () => {
-        hiddenTiers.delete(tier);
-        rebuildCurrentView();
-      });
-      addBar.appendChild(btn);
+      if (hiddenTiers.has(tier)) {
+        const btn = document.createElement("button");
+        btn.className = `add-tier-btn tier-${tier.toLowerCase()}`;
+        btn.textContent = `+ ${tier}`;
+        btn.addEventListener("click", () => {
+          hiddenTiers.delete(tier);
+          rebuildCurrentView();
+        });
+        addBar.appendChild(btn);
+      }
     }
+    
+    // Add buttons for empty tiers (tiers with no cards)
+    for (const tier of TIER_ORDER) {
+      if (!hiddenTiers.has(tier) && grouped.get(tier).length === 0 && !visibleEmptyTiers.has(tier)) {
+        const btn = document.createElement("button");
+        btn.className = `add-tier-btn tier-${tier.toLowerCase()}`;
+        btn.textContent = `+ ${tier}`;
+        btn.addEventListener("click", () => {
+          visibleEmptyTiers.add(tier);
+          rebuildCurrentView();
+        });
+        addBar.appendChild(btn);
+      }
+    }
+    
     container.appendChild(addBar);
   }
 }
@@ -652,6 +679,18 @@ function moveCard(name, newTier, type, insertBefore = null) {
 }
 
 function removeTier(tier) {
+  // Check if this is a visible empty tier that should just be hidden from view
+  const entries = currentLeaderTab === '3p' ? leaderEntries3P : currentLeaderTab === '4p' ? leaderEntries4P : currentLeaderTab === 'lore' ? loreEntries : basecourtEntries;
+  const hasCards = entries.some(e => e.tier === tier);
+  
+  if (!hasCards && visibleEmptyTiers.has(tier)) {
+    // This is a visible empty tier, just remove it from visible set
+    visibleEmptyTiers.delete(tier);
+    rebuildCurrentView();
+    return;
+  }
+
+  // Normal tier removal: move cards and hide tier
   // Find the next visible tier below to move cards into
   const visibleTiers = TIER_ORDER.filter((t) => !hiddenTiers.has(t) && t !== tier);
   if (visibleTiers.length === 0) return; // can't remove the last tier
@@ -693,6 +732,10 @@ function toggleEditMode() {
   el.editBtn.textContent = editMode ? "✅ Done" : "Edit";
   el.importBtn.style.display = editMode ? "" : "none";
   el.exportBtn.style.display = editMode ? "" : "none";
+  // Clear visible empty tiers when entering edit mode
+  if (editMode) {
+    visibleEmptyTiers.clear();
+  }
   rebuildCurrentView();
 }
 

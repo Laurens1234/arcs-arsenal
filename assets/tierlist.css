@@ -371,3 +371,5 @@
 .add-tier-btn.tier-b  { background: linear-gradient(135deg, #ffdf7f, #e0c060); }
 .add-tier-btn.tier-c  { background: linear-gradient(135deg, #ffff7f, #e0e060); }
 .add-tier-btn.tier-d  { background: linear-gradient(135deg, #bfff7f, #a0e060); }
+.add-tier-btn.tier-sss { background: linear-gradient(135deg, #9f7fff, #8060e0); }
+.add-tier-btn.tier-f  { background: linear-gradient(135deg, #7f7f7f, #606060); }
