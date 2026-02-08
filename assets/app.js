@@ -1,6 +1,6 @@
 import yaml from "https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm";
 import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
-import { buildCommunityStats } from "./community-data.js";
+import { buildCommunityStats } from "./Community-data.js";
 import { CONFIG } from "./config.js";
 
 // ========== DOM Elements ==========
@@ -71,8 +71,8 @@ let appState = {
   compareMode: false,
   compareCards: [null, null],
   insights: null,
-  dataSource: "league",      // "league" | "community"
-  playerCount: "4p",         // "3p" | "4p" (for community)
+  dataSource: "league",      // "league" | "Community"
+  playerCount: "4p",         // "3p" | "4p" (for Community)
   yamlCards: [],              // loaded card definitions
   leagueCards: null,          // { leaders, lore } from league data
 };
@@ -248,7 +248,7 @@ function calculateInsights(leaders, lore, gamesOverride) {
   let consistent = [];
   
   if (isCommunity) {
-    // For community data, use rank position vs win rate for insights
+    // For Community data, use rank position vs win rate for insights
     const avgRank = allCards.reduce((sum, c) => sum + (c.stats?.rankPosition ?? 0), 0) / allCards.length;
     // Hidden gems: high WR but drafted late (high rank number)
     underrated = allCards
@@ -327,7 +327,7 @@ function getCardBadge(card, insights) {
 function renderScatterChart(cards, container, dotClass = "leader") {
   const isCommunity = cards[0]?.stats?.isCommunity;
   
-  // X-axis: rank position (inverted so rank 1 is rightmost) for community, times picked for league
+  // X-axis: rank position (inverted so rank 1 is rightmost) for Community, times picked for league
   const xValues = cards.map(c => isCommunity ? (c.stats?.rankPosition ?? 0) : (c.stats?.timesPicked ?? 0));
   const maxX = Math.max(...xValues);
   const minX = isCommunity ? 1 : 0;
@@ -340,7 +340,7 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
   
-  // Scale functions — for community, invert X so rank 1 is on the right
+  // Scale functions — for Community, invert X so rank 1 is on the right
   const xScale = isCommunity
     ? (rank) => padding.left + ((maxX - rank) / (maxX - minX)) * chartW
     : (picks) => padding.left + (picks / (maxX || 1)) * chartW;
@@ -379,7 +379,7 @@ function renderScatterChart(cards, container, dotClass = "leader") {
     const y = yScale(card.stats?.winRate ?? 0);
     const cardType = dotClass === "all" ? (card.stats?.type === "Leader" ? "leader" : "lore") : dotClass;
     const dataExtra = isCommunity ? `data-rank="${card.stats?.rankPosition}"` : `data-picks="${card.stats?.timesPicked}"`;
-    svg += `<circle cx="${x}" cy="${y}" r="5" class="dot ${cardType}" data-name="${card.name}" data-wr="${card.stats?.winRate?.toFixed(1)}" ${dataExtra} data-type="${card.stats?.type || ''}" data-community="${isCommunity ? '1' : '0'}"/>`;
+    svg += `<circle cx="${x}" cy="${y}" r="5" class="dot ${cardType}" data-name="${card.name}" data-wr="${card.stats?.winRate?.toFixed(1)}" ${dataExtra} data-type="${card.stats?.type || ''}" data-Community="${isCommunity ? '1' : '0'}"/>`;
   });
   
   svg += `</svg>`;
@@ -400,7 +400,7 @@ function renderScatterChart(cards, container, dotClass = "leader") {
     dot.addEventListener("mouseenter", (e) => {
       const name = e.target.dataset.name;
       const wr = e.target.dataset.wr;
-      if (e.target.dataset.community === "1") {
+      if (e.target.dataset.Community === "1") {
         const rank = e.target.dataset.rank;
         tooltip.innerHTML = `<strong>${name}</strong><br>${wr}% WR · Rank #${rank}`;
       } else {
@@ -454,6 +454,15 @@ function renderHistogram(cards, container, barClass = "leader", metric = "winRat
       tooltip: "Histogram showing how often cards are picked. Bars show how many cards fall into each pick count bracket.",
       getValue: (c) => c.stats?.timesPicked ?? 0,
       binSize: null, // Auto-calculate
+      formatLabel: (val) => `${val}`,
+      showExpectedLine: false,
+    },
+    draftRank: {
+      title: "Draft Rank Distribution",
+      subtitle: "How are draft positions distributed?",
+      tooltip: "Histogram showing how draft ranks are distributed. Lower numbers indicate cards picked earlier in drafts.",
+      getValue: (c) => c.stats?.rankPosition ?? 0,
+      binSize: 5,
       formatLabel: (val) => `${val}`,
       showExpectedLine: false,
     },
@@ -796,6 +805,11 @@ function refreshHistograms(metric) {
 
 // ========== Card Rendering ==========
 function getScore(card, metric) {
+  if (metric === "draftRank") {
+    // For draft rank, lower rankPosition is better (earlier pick)
+    // Return negative rankPosition so lower positions sort first
+    return -(card.stats?.rankPosition ?? 999);
+  }
   return card.stats?.[metric] ?? 0;
 }
 
@@ -835,11 +849,11 @@ function createCardElement(card, rank, metric) {
     const pos = card.stats?.rankPosition ?? "–";
     statsHtml = `
         <div class="stat">
-          <span class="stat-value highlight">${winRate.toFixed(1)}%</span>
+          <span class="stat-value ${metric === 'winRate' ? 'highlight' : ''}">${winRate.toFixed(1)}%</span>
           <span class="stat-label">Win Rate</span>
         </div>
         <div class="stat">
-          <span class="stat-value">${pos}</span>
+          <span class="stat-value ${metric === 'draftRank' ? 'highlight' : ''}">${pos}</span>
           <span class="stat-label">Draft Rank</span>
         </div>
     `;
@@ -1115,17 +1129,17 @@ function switchDataSource(source, playerCount) {
       el.pageTagline.textContent = "Leaders & Lore win rates from Arcs League games";
     }
   } else {
-    const community = buildCommunityCards(appState.yamlCards, appState.playerCount);
-    leaders = community.leaders;
-    lore = community.lore;
-    games = community.games;
+    const Community = buildCommunityCards(appState.yamlCards, appState.playerCount);
+    leaders = Community.leaders;
+    lore = Community.lore;
+    games = Community.games;
     if (el.dataSourceLabel) {
       const label = appState.playerCount === "3p" ? "3-player" : "4-player";
       el.dataSourceLabel.innerHTML = `Community ${label} data from <a href="https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates" target="_blank">BGG</a>`;
     }
     if (el.pageTagline) {
       const label = appState.playerCount === "3p" ? "3-player" : "4-player";
-      el.pageTagline.textContent = `Leaders & Lore win rates from community ${label} games`;
+      el.pageTagline.textContent = `Leaders & Lore win rates from Community ${label} games`;
     }
   }
 
@@ -1137,17 +1151,21 @@ function switchDataSource(source, playerCount) {
   appState.allCards = [...leaders, ...lore];
   appState.compareCards = [null, null];
 
-  // For community data, only winRate metric is valid (no picks/wins data)
-  if (source === "community") {
+  // Configure metric options based on data source
+  if (source === "Community") {
     el.metric.value = "winRate";
-    // Disable wins / timesPicked options
-    for (const opt of el.metric.options) {
-      opt.disabled = (opt.value === "wins" || opt.value === "timesPicked");
-    }
+    // For Community data: enable winRate and draftRank, disable wins/timesPicked
+    el.metric.querySelector('option[value="winRate"]').disabled = false;
+    el.metric.querySelector('option[value="draftRank"]').disabled = false;
+    el.metric.querySelector('option[value="wins"]').disabled = true;
+    el.metric.querySelector('option[value="timesPicked"]').disabled = true;
   } else {
-    for (const opt of el.metric.options) {
-      opt.disabled = false;
-    }
+    el.metric.value = "winRate";
+    // For league data: enable winRate/wins/timesPicked, disable draftRank
+    el.metric.querySelector('option[value="winRate"]').disabled = false;
+    el.metric.querySelector('option[value="wins"]').disabled = false;
+    el.metric.querySelector('option[value="timesPicked"]').disabled = false;
+    el.metric.querySelector('option[value="draftRank"]').disabled = true;
   }
 
   // Re-render everything
@@ -1163,9 +1181,9 @@ function wireDataSourceToggle() {
       el.dataSourceGroup.querySelectorAll(".ds-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       const value = btn.dataset.value;
-      if (value === "community") {
+      if (value === "Community") {
         el.playerCountGroup.classList.remove("hidden");
-        switchDataSource("community", appState.playerCount);
+        switchDataSource("Community", appState.playerCount);
       } else {
         el.playerCountGroup.classList.add("hidden");
         switchDataSource("league");
@@ -1177,7 +1195,7 @@ function wireDataSourceToggle() {
     btn.addEventListener("click", () => {
       el.playerCountGroup.querySelectorAll(".ds-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      switchDataSource("community", btn.dataset.value);
+      switchDataSource("Community", btn.dataset.value);
     });
   });
 }
@@ -1214,6 +1232,12 @@ async function main() {
 
     // Wire up data source toggle
     wireDataSourceToggle();
+    
+    // Configure initial metric options for league data source
+    el.metric.querySelector('option[value="winRate"]').disabled = false;
+    el.metric.querySelector('option[value="wins"]').disabled = false;
+    el.metric.querySelector('option[value="timesPicked"]').disabled = false;
+    el.metric.querySelector('option[value="draftRank"]').disabled = true;
   } catch (err) {
     setStatus(err.message, { isError: true });
   }

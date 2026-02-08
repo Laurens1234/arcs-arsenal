@@ -1,9 +1,9 @@
 // ========== Community Draft Data ==========
-// Static data from community games (not dynamically fetched).
+// Static data from Community games (not dynamically fetched).
 // Rankings show draft pick priority (higher = picked earlier).
 // Win rates show how often a card won when picked.
 
-export const COMMUNITY_DATA = {
+export const Community_DATA = {
   "3p": {
     games: 983,
     ranking: [
@@ -80,7 +80,7 @@ export const COMMUNITY_DATA = {
 };
 
 /**
- * Build stats objects from community data.
+ * Build stats objects from Community data.
  * Only includes actual data: ranking position and win rate.
  * No fabricated picks or wins — we don't have that data.
  *
@@ -88,7 +88,7 @@ export const COMMUNITY_DATA = {
  * @returns {{ stats: Array<{name,type,rankPosition,winRate,isCommunity:true}>, games: number }}
  */
 export function buildCommunityStats(playerCount) {
-  const data = COMMUNITY_DATA[playerCount];
+  const data = Community_DATA[playerCount];
   if (!data) return { stats: [], games: 0 };
 
   const stats = [];

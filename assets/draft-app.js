@@ -1,7 +1,7 @@
 import { toBlob } from "https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/+esm";
 import yaml from "https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm";
 import Papa from "https://cdn.jsdelivr.net/npm/papaparse@5.4.1/+esm";
-import { COMMUNITY_DATA } from "./community-data.js";
+import { Community_DATA } from "./Community-data.js";
 import { CONFIG } from "./config.js";
 
 // ========== DOM ==========
@@ -75,10 +75,10 @@ let dataLeaders = [];
 let dataLore = [];
 let customLeaders = [];
 let customLore = [];
-let community3pLeaders = [];
-let community3pLore = [];
-let community4pLeaders = [];
-let community4pLore = [];
+let Community3pLeaders = [];
+let Community3pLore = [];
+let Community4pLeaders = [];
+let Community4pLore = [];
 
 let draft = {
   numPlayers: 3,
@@ -293,7 +293,7 @@ function parseRankedData(rows, cards) {
 }
 
 function parseCommunityTierData(playerCount, cards) {
-  const data = COMMUNITY_DATA[playerCount];
+  const data = Community_DATA[playerCount];
   if (!data) return { leaders: [], lore: [] };
 
   const cardMap = new Map();
@@ -1681,12 +1681,12 @@ function applyTierSource() {
   if (draft.tierSource === "data") {
     allLeaders = dataLeaders;
     allLore = dataLore;
-  } else if (draft.tierSource === "community3p") {
-    allLeaders = community3pLeaders;
-    allLore = community3pLore;
-  } else if (draft.tierSource === "community4p") {
-    allLeaders = community4pLeaders;
-    allLore = community4pLore;
+  } else if (draft.tierSource === "Community3p") {
+    allLeaders = Community3pLeaders;
+    allLore = Community3pLore;
+  } else if (draft.tierSource === "Community4p") {
+    allLeaders = Community4pLeaders;
+    allLore = Community4pLore;
   } else if (draft.tierSource === "personal3p") {
     allLeaders = personal3PLeaders;
     allLore = personalLore;
@@ -1805,18 +1805,18 @@ async function init() {
     dataLeaders = ranked.leaders;
     dataLore = ranked.lore;
 
-    // Parse community tier data (static, no fetch needed)
+    // Parse Community tier data (static, no fetch needed)
     const comm3p = parseCommunityTierData("3p", cards);
-    community3pLeaders = comm3p.leaders;
-    community3pLore = comm3p.lore;
+    Community3pLeaders = comm3p.leaders;
+    Community3pLore = comm3p.lore;
 
     const comm4p = parseCommunityTierData("4p", cards);
-    community4pLeaders = comm4p.leaders;
-    community4pLore = comm4p.lore;
+    Community4pLeaders = comm4p.leaders;
+    Community4pLore = comm4p.lore;
 
     if (personalLeaders.length === 0 && personalLore.length === 0 &&
         dataLeaders.length === 0 && dataLore.length === 0 &&
-        community4pLeaders.length === 0 && community4pLore.length === 0) {
+        Community4pLeaders.length === 0 && Community4pLore.length === 0) {
       setStatus("No tier list data found.", { isError: true });
       return;
     }

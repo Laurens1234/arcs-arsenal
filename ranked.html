@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Arcs Leaders & Lore Ranked</title>
+    <title>Arcs Leaders & Lore Arsenal</title>
     <meta name="description" content="Arcs cards ranked with win rates and pick statistics." />
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Arcs Leaders & Lore Ranked" />
+    <meta property="og:title" content="Arcs Leaders & Lore Arsenal" />
     <meta property="og:description" content="Arcs cards ranked with win rates and pick statistics." />
     <meta property="og:image" content="./favicon.svg" />
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="Arcs Leaders & Lore Ranked" />
+    <meta name="twitter:title" content="Arcs Leaders & Lore Arsenal" />
     <meta name="twitter:description" content="Arcs cards ranked with win rates and pick statistics." />
     <meta name="twitter:image" content="./favicon.svg" />
     <meta name="theme-color" content="#8b5cf6" />
@@ -59,7 +59,7 @@
     <header class="header">
       <div class="container header-inner">
         <div>
-          <h1 class="logo"><a href="./index.html" style="text-decoration:none;color:inherit">Arcs Ranked</a></h1>
+          <h1 class="logo"><a href="./index.html" style="text-decoration:none;color:inherit">Arcs Arsenal</a></h1>
           <p class="tagline" id="pageTagline">Leaders & Lore win rates from Arcs League games</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
@@ -86,6 +86,7 @@
             <option value="winRate">Win Rate %</option>
             <option value="wins">Total Wins</option>
             <option value="timesPicked">Times Picked</option>
+            <option value="draftRank" class="Community-only">Draft Rank</option>
           </select>
           <input id="query" type="search" class="search" placeholder="Search…" />
           <a href="./index.html" class="btn-compare">← Home</a>
@@ -99,7 +100,7 @@
         <span style="font-size:0.85rem;font-weight:600;color:var(--text-muted)">Data Source:</span>
         <div class="data-source-toggle" id="dataSourceGroup">
           <button class="ds-btn active" data-value="league">League</button>
-          <button class="ds-btn" data-value="community">Community</button>
+          <button class="ds-btn" data-value="Community">Community</button>
         </div>
         <div class="data-source-toggle hidden" id="playerCountGroup">
           <button class="ds-btn" data-value="3p">3P (983 games)</button>
