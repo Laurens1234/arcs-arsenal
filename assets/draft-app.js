@@ -1278,8 +1278,8 @@ async function generateBalancedDraft() {
     validateStartButton();
 
     // Start draft and directly assign the optimal result
-    draft.generatedByBalanced = true;
     startDraft();
+    draft.generatedByBalanced = true;
 
     // Apply the optimal assignments as picks (no draft order needed)
     for (let p = 0; p < numPlayers; p++) {
@@ -1317,6 +1317,7 @@ async function generateBalancedDraft() {
 
 // ========== Draft Logic ==========
 function startDraft() {
+  draft.generatedByBalanced = false;
   draft.order = buildDraftOrder(draft.numPlayers);
   draft.pickIndex = 0;
   draft.history = [];
@@ -1523,6 +1524,26 @@ function undoPick() {
   }
 
   el.undoBtn.disabled = draft.history.length === 0;
+  renderDraft();
+}
+
+function undoAllPicks() {
+  while (draft.history.length > 0) {
+    const last = draft.history.pop();
+    draft.pickIndex = last.pickIndex;
+    draft.active = true;
+
+    if (last.type === "leader") {
+      draft.players[last.playerIdx].leader = null;
+      draft.availableLeaders.push(last.card);
+      draft.availableLeaders.sort((a, b) => b.value - a.value);
+    } else {
+      draft.players[last.playerIdx].lore.pop();
+      draft.availableLore.push(last.card);
+      draft.availableLore.sort((a, b) => b.value - a.value);
+    }
+  }
+  el.undoBtn.disabled = true;
   renderDraft();
 }
 
@@ -1898,7 +1919,7 @@ async function init() {
     if (draft.generatedByBalanced) {
       generateBalancedDraft();
     } else {
-      resetDraftToSetup();
+      undoAllPicks();
     }
   });
 
