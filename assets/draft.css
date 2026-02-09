@@ -288,6 +288,65 @@
   margin-top: 2px;
 }
 
+.handicap-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.handicap-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-solid);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  min-width: 0; /* Allow flex items to shrink */
+}
+
+.handicap-player label {
+  font-weight: 500;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.handicap-player input[type="range"] {
+  flex: 1;
+  margin: 0 12px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  accent-color: var(--accent);
+  min-width: 60px; /* Ensure minimum width */
+}
+
+.handicap-player input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.handicap-player input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
+.handicap-player .handicap-count {
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 20px;
+  text-align: center;
+}
+
 /* Pool Selection */
 .pool-section {
   background: var(--bg-card);
@@ -606,6 +665,17 @@
   font-size: 0.75rem;
   color: var(--text-dim);
   text-align: center;
+}
+
+.player-handicap {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Available Cards */

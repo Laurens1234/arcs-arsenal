@@ -45,6 +45,13 @@ const el = {
   exportCloseBtn: document.getElementById("exportCloseBtn"),
   exportModalClose: document.getElementById("exportModalClose"),
   exportModalBackdrop: document.getElementById("exportModalBackdrop"),
+  // Share modal
+  shareModal: document.getElementById("shareModal"),
+  shareSections: document.getElementById("shareSections"),
+  shareConfirmBtn: document.getElementById("shareConfirmBtn"),
+  shareCancelBtn: document.getElementById("shareCancelBtn"),
+  shareModalClose: document.getElementById("shareModalClose"),
+  shareModalBackdrop: document.getElementById("shareModalBackdrop"),
 };
 
 // ========== State ==========
@@ -254,7 +261,11 @@ function parseTierListSheet(rows, cards) {
 // ========== Rendering ==========
 const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F"];
 
-function buildTierListHTML(entries, container, type) {
+function buildTierListHTML(entries, container, type, sectionName) {
+  // Check if all entries have the same custom section name
+  const customSectionNames = new Set(entries.map(e => e.customSectionName).filter(Boolean));
+  const displaySectionName = customSectionNames.size === 1 ? customSectionNames.values().next().value : sectionName;
+  
   // Group by tier
   const grouped = new Map();
   for (const tier of TIER_ORDER) {
@@ -266,6 +277,15 @@ function buildTierListHTML(entries, container, type) {
   }
 
   container.innerHTML = "";
+
+  // Add section header if we have a custom name
+  if (displaySectionName) {
+    const header = document.createElement("h3");
+    header.className = "section-header";
+    header.textContent = displaySectionName;
+    header.style.cssText = "margin:0 0 16px 0;font-size:1.2rem;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);padding-bottom:8px";
+    container.appendChild(header);
+  }
 
   for (const tier of TIER_ORDER) {
     if (hiddenTiers.has(tier)) continue;
@@ -874,6 +894,11 @@ function closeExportModal() {
   document.body.style.overflow = "";
 }
 
+function closeShareModal() {
+  el.shareModal.classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
 // ========== Import ==========
 function openImportModal() {
   el.importUrl.value = "";
@@ -955,6 +980,9 @@ function initTabs() {
 
   el.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
+      // Don't allow clicking disabled tabs
+      if (tab.classList.contains('disabled')) return;
+      
       const target = tab.dataset.tab;
       el.tabs.forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
@@ -979,6 +1007,9 @@ function initTabs() {
   // Sub-tab switching
   el.subTabs.forEach((subTab) => {
     subTab.addEventListener("click", () => {
+      // Don't allow clicking disabled sub-tabs
+      if (subTab.classList.contains('disabled')) return;
+      
       const target = subTab.dataset.subtab;
       el.subTabs.forEach((t) => t.classList.remove("active"));
       subTab.classList.add("active");
@@ -994,6 +1025,58 @@ function initTabs() {
   // Initialize sub-tabs visibility
   if (el.tabs[0].classList.contains('active') && el.tabs[0].dataset.tab === 'leaders') {
     el.leaderSubTabs.style.display = '';
+  }
+}
+
+function disableEmptyTabs() {
+  // Check if this is a shared tier list (has URL parameter)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isSharedTierList = urlParams.has('tierlist');
+  
+  if (!isSharedTierList) return; // Only disable tabs for shared tier lists
+  
+  // Disable main tabs for empty sections
+  const tabMappings = {
+    'leaders': leaderEntries3P.length > 0 || leaderEntries4P.length > 0,
+    'lore': loreEntries.length > 0,
+    'basecourt': basecourtEntries.length > 0
+  };
+  
+  el.tabs.forEach((tab) => {
+    const tabType = tab.dataset.tab;
+    const hasData = tabMappings[tabType];
+    
+    if (!hasData) {
+      tab.classList.add('disabled');
+    }
+  });
+  
+  // Disable sub-tabs for empty leader sections
+  el.subTabs.forEach((subTab) => {
+    const subTabType = subTab.dataset.subtab;
+    const hasData = subTabType === '3p' ? leaderEntries3P.length > 0 : leaderEntries4P.length > 0;
+    
+    if (!hasData) {
+      subTab.classList.add('disabled');
+    }
+  });
+  
+  // If current active tab is disabled, switch to first available tab
+  const activeTab = Array.from(el.tabs).find(tab => tab.classList.contains('active'));
+  if (activeTab && activeTab.classList.contains('disabled')) {
+    const firstEnabledTab = Array.from(el.tabs).find(tab => !tab.classList.contains('disabled'));
+    if (firstEnabledTab) {
+      firstEnabledTab.click();
+    }
+  }
+  
+  // If current active sub-tab is disabled, switch to first available sub-tab
+  const activeSubTab = Array.from(el.subTabs).find(subTab => subTab.classList.contains('active'));
+  if (activeSubTab && activeSubTab.classList.contains('disabled')) {
+    const firstEnabledSubTab = Array.from(el.subTabs).find(subTab => !subTab.classList.contains('disabled'));
+    if (firstEnabledSubTab) {
+      firstEnabledSubTab.click();
+    }
   }
 }
 
@@ -1070,40 +1153,43 @@ function initDownload() {
 const TIER_MAP = { 'SSS': '0', 'SS': '1', 'S': '2', 'A': '3', 'B': '4', 'C': '5', 'D': '6', 'F': '7' };
 const REVERSE_TIER_MAP = { '0': 'SSS', '1': 'SS', '2': 'S', '3': 'A', '4': 'B', '5': 'C', '6': 'D', '7': 'F' };
 
-function encodeTierListForURL(leaders3P, leaders4P, lore, basecourt) {
+function encodeTierListForURL(selectedSections) {
   // Build card index map for compression
   const cardIndex = new Map();
   allCards.forEach((card, index) => {
     cardIndex.set(card.name, index);
   });
   
-  // Create ultra-compact format: Section:idx(2)digit(1)idx(2)digit(1)...
-  const sections = [
-    { name: '3', data: leaders3P },
-    { name: '4', data: leaders4P },
-    { name: 'L', data: lore },
-    { name: 'B', data: basecourt }
-  ];
-  
+  // Create format: name|Section:idx(2)digit(1)idx(2)digit(1)...|name|Section:...
   const parts = [];
-  for (const section of sections) {
-    if (section.data.length > 0) {
-      let entries = '';
-      for (const entry of section.data) {
-        const index = cardIndex.get(entry.name);
-        const tierDigit = TIER_MAP[entry.tier];
-        if (index !== undefined && tierDigit) {
-          entries += index.toString().padStart(2, '0') + tierDigit;
-        }
+  for (const section of selectedSections) {
+    let entries = '';
+    for (const entry of section.data) {
+      const index = cardIndex.get(entry.name);
+      const tierDigit = TIER_MAP[entry.tier];
+      if (index !== undefined && tierDigit) {
+        entries += index.toString().padStart(2, '0') + tierDigit;
       }
-      
-      if (entries) {
-        parts.push(`${section.name}:${entries}`);
-      }
+    }
+    
+    if (entries) {
+      // Encode section name and data
+      const sectionCode = getSectionCode(section.id);
+      parts.push(`${btoa(section.name)}|${sectionCode}:${entries}`);
     }
   }
   
   return btoa(parts.join('|')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function getSectionCode(sectionId) {
+  switch (sectionId) {
+    case 'leaders3p': return '3';
+    case 'leaders4p': return '4';
+    case 'lore': return 'L';
+    case 'basecourt': return 'B';
+    default: return 'U'; // Unknown
+  }
 }
 
 function decodeTierListFromURL(encoded) {
@@ -1111,38 +1197,74 @@ function decodeTierListFromURL(encoded) {
     // Add back base64 padding and convert from URL-safe
     const padded = encoded.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - encoded.length % 4) % 4);
     const data = atob(padded);
-    const sections = data.split('|');
+    const parts = data.split('|');
     
     const leaders3P = [];
     const leaders4P = [];
     const lore = [];
     const basecourt = [];
     
-    // Build card array for decoding
-    const cardArray = allCards;
+    // Detect format: if first part is a section code (3,4,L,B), it's old format
+    // If first part is base64 encoded name, it's new format
+    const isOldFormat = /^[34LB]:/.test(parts[0]);
     
-    for (const section of sections) {
-      const [sectionName, entriesStr] = section.split(':');
-      if (!entriesStr) continue;
-      
-      let targetArray;
-      switch (sectionName) {
-        case '3': targetArray = leaders3P; break;
-        case '4': targetArray = leaders4P; break;
-        case 'L': targetArray = lore; break;
-        case 'B': targetArray = basecourt; break;
-        default: continue;
+    if (isOldFormat) {
+      // Old format: Section:entries|Section:entries...
+      for (const section of parts) {
+        const [sectionName, entriesStr] = section.split(':');
+        if (!entriesStr) continue;
+        
+        let targetArray;
+        switch (sectionName) {
+          case '3': targetArray = leaders3P; break;
+          case '4': targetArray = leaders4P; break;
+          case 'L': targetArray = lore; break;
+          case 'B': targetArray = basecourt; break;
+          default: continue;
+        }
+        
+        // Parse fixed-width entries: 2 digits index + 1 digit tier
+        for (let i = 0; i < entriesStr.length; i += 3) {
+          const indexStr = entriesStr.substr(i, 2);
+          const tierDigit = entriesStr.substr(i + 2, 1);
+          const index = parseInt(indexStr, 10);
+          const tier = REVERSE_TIER_MAP[tierDigit];
+          if (!isNaN(index) && index >= 0 && index < allCards.length && tier) {
+            const card = allCards[index];
+            targetArray.push({ name: card.name, tier, card });
+          }
+        }
       }
-      
-      // Parse fixed-width entries: 2 digits index + 1 digit tier
-      for (let i = 0; i < entriesStr.length; i += 3) {
-        const indexStr = entriesStr.substr(i, 2);
-        const tierDigit = entriesStr.substr(i + 2, 1);
-        const index = parseInt(indexStr, 10);
-        const tier = REVERSE_TIER_MAP[tierDigit];
-        if (!isNaN(index) && index >= 0 && index < cardArray.length && tier) {
-          const card = cardArray[index];
-          targetArray.push({ name: card.name, tier, card });
+    } else {
+      // New format: name|Section:entries|name|Section:entries...
+      for (let i = 0; i < parts.length; i += 2) {
+        if (i + 1 >= parts.length) break;
+        
+        const nameEncoded = parts[i];
+        const sectionData = parts[i + 1];
+        
+        const customName = atob(nameEncoded);
+        const [sectionName, entriesStr] = sectionData.split(':');
+        
+        let targetArray;
+        switch (sectionName) {
+          case '3': targetArray = leaders3P; break;
+          case '4': targetArray = leaders4P; break;
+          case 'L': targetArray = lore; break;
+          case 'B': targetArray = basecourt; break;
+          default: continue;
+        }
+        
+        // Parse fixed-width entries: 2 digits index + 1 digit tier
+        for (let j = 0; j < entriesStr.length; j += 3) {
+          const indexStr = entriesStr.substr(j, 2);
+          const tierDigit = entriesStr.substr(j + 2, 1);
+          const index = parseInt(indexStr, 10);
+          const tier = REVERSE_TIER_MAP[tierDigit];
+          if (!isNaN(index) && index >= 0 && index < allCards.length && tier) {
+            const card = allCards[index];
+            targetArray.push({ name: card.name, tier, card, customSectionName: customName });
+          }
         }
       }
     }
@@ -1155,54 +1277,62 @@ function decodeTierListFromURL(encoded) {
 }
 
 function updateMetaTagsForSharedTierList(encoded) {
-  // Parse encoded string to get counts without needing card data
+  // Parse encoded string to get counts and names without needing card data
   try {
     const padded = encoded.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - encoded.length % 4) % 4);
     const data = atob(padded);
-    const sections = data.split('|');
+    const parts = data.split('|');
     
-    let leader3pCount = 0;
-    let leader4pCount = 0;
-    let loreCount = 0;
-    let basecourtCount = 0;
+    let totalCount = 0;
+    const sectionNames = [];
     
-    for (const section of sections) {
-      const [sectionName, entriesStr] = section.split(':');
-      if (!entriesStr) continue;
-      
-      const count = Math.floor(entriesStr.length / 3); // Each entry is 3 chars
-      
-      switch (sectionName) {
-        case '3': leader3pCount = count; break;
-        case '4': leader4pCount = count; break;
-        case 'L': loreCount = count; break;
-        case 'B': basecourtCount = count; break;
+    // Detect format
+    const isOldFormat = /^[34LB]:/.test(parts[0]);
+    
+    if (isOldFormat) {
+      // Old format: Section:entries|Section:entries...
+      for (const section of parts) {
+        const [sectionName, entriesStr] = section.split(':');
+        if (entriesStr) {
+          const entryCount = entriesStr.length / 3; // Each entry is 3 characters
+          totalCount += entryCount;
+          
+          // Add default section names
+          switch (sectionName) {
+            case '3': sectionNames.push('3P Leaders'); break;
+            case '4': sectionNames.push('4P Leaders'); break;
+            case 'L': sectionNames.push('Lore'); break;
+            case 'B': sectionNames.push('Base Court'); break;
+          }
+        }
+      }
+    } else {
+      // New format: name|Section:entries|name|Section:entries...
+      for (let i = 0; i < parts.length; i += 2) {
+        if (i + 1 >= parts.length) break;
+        
+        const nameEncoded = parts[i];
+        const sectionData = parts[i + 1];
+        
+        const customName = atob(nameEncoded);
+        const [sectionName, entriesStr] = sectionData.split(':');
+        
+        if (entriesStr) {
+          const entryCount = entriesStr.length / 3; // Each entry is 3 characters
+          totalCount += entryCount;
+          sectionNames.push(customName);
+        }
       }
     }
     
-    const totalCount = leader3pCount + leader4pCount + loreCount + basecourtCount;
+    const title = sectionNames.length > 0 ? `Shared ${sectionNames.join(', ')}` : 'Shared Arcs Tier List';
+    const description = `View this custom tier list with ${totalCount} card rankings${sectionNames.length > 0 ? ` (${sectionNames.join(', ')})` : ''}.`;
     
-    // Create description
-    let description = `Check out this custom tier list for Arcs with ${totalCount} ranked cards`;
-    if (leader3pCount > 0) description += `, ${leader3pCount} 3P leaders`;
-    if (leader4pCount > 0) description += `, ${leader4pCount} 4P leaders`;
-    if (loreCount > 0) description += `, ${loreCount} lore cards`;
-    if (basecourtCount > 0) description += `, ${basecourtCount} base court cards`;
-    description += ".";
+    document.title = title;
     
-    // Update title
-    document.title = "Shared Arcs Tier List";
-    
-    // Update meta description
-    const descriptionMeta = document.querySelector('meta[name="description"]');
-    if (descriptionMeta) {
-      descriptionMeta.content = description;
-    }
-    
-    // Update Open Graph tags
     const ogTitle = document.querySelector('meta[property="og:title"]');
     if (ogTitle) {
-      ogTitle.content = "Shared Arcs Tier List";
+      ogTitle.content = title;
     }
     
     const ogDescription = document.querySelector('meta[property="og:description"]');
@@ -1210,10 +1340,9 @@ function updateMetaTagsForSharedTierList(encoded) {
       ogDescription.content = description;
     }
     
-    // Update Twitter tags
     const twitterTitle = document.querySelector('meta[name="twitter:title"]');
     if (twitterTitle) {
-      twitterTitle.content = "Shared Arcs Tier List";
+      twitterTitle.content = title;
     }
     
     const twitterDescription = document.querySelector('meta[name="twitter:description"]');
@@ -1226,7 +1355,85 @@ function updateMetaTagsForSharedTierList(encoded) {
 }
 
 function shareTierList() {
-  const encoded = encodeTierListForURL(leaderEntries3P, leaderEntries4P, loreEntries, basecourtEntries);
+  populateShareModal();
+  el.shareModal.classList.remove('hidden');
+}
+
+function populateShareModal() {
+  const sections = [
+    { id: 'leaders3p', name: '3P Leaders', data: leaderEntries3P, defaultName: '3P Leaders' },
+    { id: 'leaders4p', name: '4P Leaders', data: leaderEntries4P, defaultName: '4P Leaders' },
+    { id: 'lore', name: 'Lore', data: loreEntries, defaultName: 'Lore' },
+    { id: 'basecourt', name: 'Base Court', data: basecourtEntries, defaultName: 'Base Court' }
+  ];
+  
+  el.shareSections.innerHTML = '';
+  
+  sections.forEach(section => {
+    if (section.data.length === 0) return; // Skip empty sections
+    
+    const sectionDiv = document.createElement('div');
+    sectionDiv.style.cssText = 'margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid)';
+    
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `share-${section.id}`;
+    checkbox.checked = true; // Default to included
+    checkbox.style.cssText = 'margin-right:8px';
+    
+    const label = document.createElement('label');
+    label.htmlFor = `share-${section.id}`;
+    label.textContent = section.name;
+    label.style.cssText = 'font-weight:600;margin-right:12px';
+    
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.id = `name-${section.id}`;
+    nameInput.value = section.defaultName;
+    nameInput.placeholder = 'Custom name';
+    nameInput.style.cssText = 'flex:1;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-solid);color:var(--text);font-family:inherit;font-size:0.85rem';
+    
+    sectionDiv.appendChild(checkbox);
+    sectionDiv.appendChild(label);
+    sectionDiv.appendChild(nameInput);
+    
+    el.shareSections.appendChild(sectionDiv);
+  });
+}
+
+function confirmShare() {
+  const selectedSections = [];
+  
+  // Collect selected sections
+  const checkboxes = el.shareSections.querySelectorAll('input[type="checkbox"]:checked');
+  checkboxes.forEach(checkbox => {
+    const sectionId = checkbox.id.replace('share-', '');
+    const nameInput = document.getElementById(`name-${sectionId}`);
+    const customName = nameInput.value.trim() || nameInput.placeholder;
+    
+    let data;
+    switch (sectionId) {
+      case 'leaders3p': data = leaderEntries3P; break;
+      case 'leaders4p': data = leaderEntries4P; break;
+      case 'lore': data = loreEntries; break;
+      case 'basecourt': data = basecourtEntries; break;
+    }
+    
+    if (data && data.length > 0) {
+      selectedSections.push({
+        id: sectionId,
+        name: customName,
+        data: data
+      });
+    }
+  });
+  
+  if (selectedSections.length === 0) {
+    alert('Please select at least one tier list to share.');
+    return;
+  }
+  
+  const encoded = encodeTierListForURL(selectedSections);
   const url = new URL(window.location);
   url.searchParams.set('tierlist', encoded);
   
@@ -1237,6 +1444,8 @@ function shareTierList() {
     // Fallback: show the URL
     alert(`Shareable link:\n${url.toString()}`);
   });
+  
+  el.shareModal.classList.add('hidden');
 }
 
 async function loadDefaultTierList() {
@@ -1285,6 +1494,12 @@ async function init() {
   el.importModalClose.addEventListener("click", closeImportModal);
   el.importModalBackdrop.addEventListener("click", closeImportModal);
 
+  // Share modal
+  el.shareConfirmBtn.addEventListener("click", confirmShare);
+  el.shareCancelBtn.addEventListener("click", closeShareModal);
+  el.shareModalClose.addEventListener("click", closeShareModal);
+  el.shareModalBackdrop.addEventListener("click", closeShareModal);
+
   // Modal events
   el.modalClose.addEventListener("click", closeModal);
   el.modalBackdrop.addEventListener("click", closeModal);
@@ -1293,6 +1508,7 @@ async function init() {
       closeModal();
       closeImportModal();
       closeExportModal();
+      closeShareModal();
     }
   });
 
@@ -1338,10 +1554,13 @@ async function init() {
     loreEntries = tierData.lore;
     basecourtEntries = tierData.basecourt;
 
-    buildTierListHTML(leaderEntries3P, el.leaders3pTierList, "leaders");
-    buildTierListHTML(leaderEntries4P, el.leaders4pTierList, "leaders");
-    buildTierListHTML(loreEntries, el.loreTierList, "lore");
-    buildTierListHTML(basecourtEntries, el.basecourtTierList, "basecourt");
+    buildTierListHTML(leaderEntries3P, el.leaders3pTierList, "leaders", "3P Leaders");
+    buildTierListHTML(leaderEntries4P, el.leaders4pTierList, "leaders", "4P Leaders");
+    buildTierListHTML(loreEntries, el.loreTierList, "lore", "Lore");
+    buildTierListHTML(basecourtEntries, el.basecourtTierList, "basecourt", "Base Court");
+
+    // Disable tabs for empty sections in shared tier lists
+    disableEmptyTabs();
 
     setStatus("");
   } catch (err) {

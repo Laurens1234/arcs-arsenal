@@ -40,6 +40,13 @@
   box-shadow: 0 4px 15px var(--accent-glow);
 }
 
+.tab.disabled,
+.sub-tab.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .personal-tier-list {
   display: flex;
   flex-direction: column;

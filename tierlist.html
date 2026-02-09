@@ -106,6 +106,27 @@
       </div>
     </div>
 
+    <!-- Share Modal -->
+    <div id="shareModal" class="modal hidden">
+      <div class="modal-backdrop" id="shareModalBackdrop"></div>
+      <div class="modal-content" style="max-width:600px">
+        <button class="modal-close" id="shareModalClose">✕</button>
+        <div style="padding:24px">
+          <h2 style="margin:0 0 12px">Share Tier List</h2>
+          <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 16px">Select which tier lists to include in your shared URL and give them custom names.</p>
+          
+          <div id="shareSections" style="margin-bottom:16px">
+            <!-- Sections will be populated by JavaScript -->
+          </div>
+          
+          <div style="display:flex;gap:8px;justify-content:flex-end">
+            <button id="shareCancelBtn" class="btn-compare">Cancel</button>
+            <button id="shareConfirmBtn" class="btn-compare" style="border-color:var(--accent);color:var(--accent)">🔗 Share</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <main class="main">
       <div class="container">
         <div id="status" class="status">Loading tier list…</div>

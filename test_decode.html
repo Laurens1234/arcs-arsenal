@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Decoding</title>
+</head>
+<body>
+    <script>
+        const encoded = 'V1hWdHwzOjM5NzM3NzQwNzQzNzI4NzI5NzM2NzM0NzMxNzM1NzMzNzQyNzM4NzQxNzMyNzMwMA';
+        
+        try {
+            // Add padding
+            const padded = encoded + '='.repeat((4 - encoded.length % 4) % 4);
+            console.log('Padded:', padded);
+            
+            const decoded = atob(padded);
+            console.log('Decoded:', decoded);
+            
+            const parts = decoded.split('|');
+            console.log('Parts:', parts);
+            
+            for (let i = 0; i < parts.length; i += 2) {
+                if (i + 1 >= parts.length) break;
+                
+                const nameEncoded = parts[i];
+                const sectionData = parts[i + 1];
+                
+                const customName = atob(nameEncoded);
+                console.log('Custom name:', customName);
+                
+                const [sectionName, entriesStr] = sectionData.split(':');
+                console.log('Section:', sectionName, 'Entries length:', entriesStr.length);
+            }
+        } catch (e) {
+            console.error('Error:', e);
+        }
+    </script>
+</body>
+</html>
