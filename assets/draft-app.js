@@ -159,6 +159,18 @@ function toggleTheme() {
 const TIER_BASE = { SSS: 7, SS: 6, S: 5, A: 4, B: 3, C: 2, D: 1, F: 0 };
 const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F"];
 
+// Leader-Lore synergies: { leader: string, lore: string, bonus: number | function(numPlayers) }
+const SYNERGIES = [
+  { leader: "Noble", lore: "Tycoon's Ambition", bonus: 6 },
+  { leader: "Mystic", lore: "Living Structures", bonus: 4 },
+  { leader: "Upstart", lore: "Tycoon's Ambition", bonus: 3 },
+  { leader: "Demagogue", lore: "Tycoon's Ambition", bonus: 6 },
+  { leader: "Fuel-Drinker", lore: "Living Structures", bonus: 3 },
+  { leader: "Fuel-Drinker", lore: "Tycoon's Charm", bonus: (numPlayers) => numPlayers === 3 ? 6 : 3 },
+  { leader: "Agitator", lore: "Living Structures", bonus: 3 },
+  { leader: "Anarchist", lore: "Living Structures", bonus: (numPlayers) => draft.generatedByBalanced ? -4 : -2 },
+];
+
 function assignValues(entries) {
   // Group by tier, assign sub-values within each tier based on position
   const grouped = new Map();
@@ -194,10 +206,27 @@ function getLoreCountForPlayer(playerIndex, draftObj = draft) {
   return draftObj.lorePerPlayer;
 }
 
+function getSynergyBonus(player) {
+  let bonus = 0;
+  for (const synergy of SYNERGIES) {
+    if (player.leader && player.leader.name === synergy.leader) {
+      const hasLore = player.lore.some(l => l.name === synergy.lore);
+      if (hasLore) {
+        const synergyBonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+        bonus += synergyBonus;
+      }
+    }
+  }
+  return bonus;
+}
+
 function playerTotalScore(player, playerIndex) {
   let score = 0;
   if (player.leader) score += getWeightedScore(player.leader, "leader");
   for (const l of player.lore) score += getWeightedScore(l, "lore");
+  
+  // Add synergy bonuses
+  score += getSynergyBonus(player);
   
   // Add handicap bonus (1 handicap = 1x leader weight)
   const handicap = draft.handicaps[playerIndex] || 0;
@@ -661,22 +690,60 @@ function initSetupUI() {
               for (const card of cards) {
                 let opportunityCost;
                 if (card.pickType === "leader") {
-                  const cardScore = getWeightedScore(card, "leader");
+                  let cardScore = getWeightedScore(card, "leader");
+                  // Add synergy bonus if this leader synergizes with current lore
+                  for (const synergy of SYNERGIES) {
+                    if (card.name === synergy.leader) {
+                      const hasLore = simDraft.players[playerIdx].lore.some(l => l.name === synergy.lore);
+                      if (hasLore) {
+                        const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(simDraft.numPlayers) : synergy.bonus;
+                        cardScore += bonus;
+                      }
+                    }
+                  }
                   const leadersTakenBefore = Math.min(competitorsForLeader, picksBeforeMyNextTurn);
                   const replacementIdx = leadersTakenBefore;
                   if (replacementIdx < sortedLeaders.length) {
-                    const replacement = sortedLeaders[replacementIdx];
-                    opportunityCost = cardScore - getWeightedScore(replacement, "leader");
+                    let replacementScore = getWeightedScore(sortedLeaders[replacementIdx], "leader");
+                    // Add synergy bonus for replacement if applicable
+                    for (const synergy of SYNERGIES) {
+                      if (sortedLeaders[replacementIdx].name === synergy.leader) {
+                        const hasLore = simDraft.players[playerIdx].lore.some(l => l.name === synergy.lore);
+                        if (hasLore) {
+                          const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(simDraft.numPlayers) : synergy.bonus;
+                          replacementScore += bonus;
+                        }
+                      }
+                    }
+                    opportunityCost = cardScore - replacementScore;
                   } else {
                     opportunityCost = cardScore;
                   }
                 } else {
+                  let cardScore = getWeightedScore(card, "lore");
+                  // Add synergy bonus if this lore synergizes with current leader
+                  if (simDraft.players[playerIdx].leader) {
+                    for (const synergy of SYNERGIES) {
+                      if (simDraft.players[playerIdx].leader.name === synergy.leader && card.name === synergy.lore) {
+                        const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(simDraft.numPlayers) : synergy.bonus;
+                        cardScore += bonus;
+                      }
+                    }
+                  }
                   const loreTakenBefore = Math.min(competitorsForLore, picksBeforeMyNextTurn);
-                  const cardScore = getWeightedScore(card, "lore");
                   const replacementIdx = loreTakenBefore;
                   if (replacementIdx < sortedLore.length) {
-                    const replacement = sortedLore[replacementIdx];
-                    opportunityCost = cardScore - getWeightedScore(replacement, "lore");
+                    let replacementScore = getWeightedScore(sortedLore[replacementIdx], "lore");
+                    // Add synergy bonus for replacement if applicable
+                    if (simDraft.players[playerIdx].leader) {
+                      for (const synergy of SYNERGIES) {
+                        if (simDraft.players[playerIdx].leader.name === synergy.leader && sortedLore[replacementIdx].name === synergy.lore) {
+                          const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(simDraft.numPlayers) : synergy.bonus;
+                          replacementScore += bonus;
+                        }
+                      }
+                    }
+                    opportunityCost = cardScore - replacementScore;
                   } else {
                     opportunityCost = cardScore;
                   }
@@ -905,7 +972,45 @@ function renderPoolSection(container, entries, selected, type) {
       imgHTML = `<img class="pool-card-img" src="${imgUrl}" alt="${entry.name}" loading="lazy" />`;
     }
 
-    btn.innerHTML = `${imgHTML}<span class="tier-badge tier-${entry.tier.toLowerCase()}">${entry.tier}</span><span class="pool-card-points">${getWeightedScore(entry, type).toFixed(1)}</span><span class="pool-card-name">${entry.name}</span>`;
+    // Add synergy info
+    let hasSynergy = false;
+    for (const synergy of SYNERGIES) {
+      if ((type === "leader" && entry.name === synergy.leader) || (type === "lore" && entry.name === synergy.lore)) {
+        hasSynergy = true;
+        break;
+      }
+    }
+    const synergyBadge = hasSynergy ? '<span class="synergy-badge">★</span>' : '';
+    
+    btn.innerHTML = `${imgHTML}<span class="tier-badge tier-${entry.tier.toLowerCase()}">${entry.tier}</span>${synergyBadge}<span class="pool-card-points">${getWeightedScore(entry, type).toFixed(1)}</span><span class="pool-card-name">${entry.name}</span>`;
+    
+    // Add synergy info to title
+    let synergyInfo = [];
+    let hasPositive = false;
+    let hasNegative = false;
+    for (const synergy of SYNERGIES) {
+      if (type === "leader" && entry.name === synergy.leader) {
+        const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+        const sign = bonus > 0 ? '+' : '';
+        synergyInfo.push(`${sign}${bonus}.0 pts with ${synergy.lore}`);
+        if (bonus > 0) hasPositive = true;
+        else hasNegative = true;
+      } else if (type === "lore" && entry.name === synergy.lore) {
+        const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+        const sign = bonus > 0 ? '+' : '';
+        synergyInfo.push(`${sign}${bonus}.0 pts with ${synergy.leader}`);
+        if (bonus > 0) hasPositive = true;
+        else hasNegative = true;
+      }
+    }
+    if (synergyInfo.length > 0) {
+      let label = 'Bonuses';
+      if (hasPositive && !hasNegative) label = 'Synergies';
+      else if (!hasPositive && hasNegative) label = 'Anti-synergies';
+      else if (hasPositive && hasNegative) label = 'Synergies/Anti-synergies';
+      btn.title = `${label}: ${synergyInfo.join(', ')}`;
+    }
+    
     btn.addEventListener("click", () => {
       const maxSize = parseInt(type === "leader" ? el.leaderPoolSize.value : el.lorePoolSize.value);
       if (selected.has(entry.name)) {
@@ -1189,6 +1294,20 @@ async function generateBalancedDraft() {
         }
       }
 
+      // Add synergy bonuses
+      for (let p = 0; p < numPlayers; p++) {
+        const leader = leaderPerm[p];
+        for (const synergy of SYNERGIES) {
+          if (leader.name === synergy.leader) {
+            const hasLore = playerLore[p].some(l => l.name === synergy.lore);
+            if (hasLore) {
+              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              playerScores[p] += bonus;
+            }
+          }
+        }
+      }
+
       // Check if we assigned enough lore
       const totalAssigned = playerLore.reduce((sum, lore) => sum + lore.length, 0);
       if (totalAssigned < totalLoreNeeded) continue;
@@ -1421,24 +1540,112 @@ function getBestPick(playerIdx) {
       // At most `competitorsForLeader` opponents want a leader, but only
       // `picksBeforeMyNextTurn` picks happen before I go again, and not all
       // of those will be leaders.
-      const cardScore = getWeightedScore(card, "leader");
+      let cardScore = getWeightedScore(card, "leader");
+      // Add synergy bonus if this leader synergizes with current lore
+      if (!player.leader) {
+        for (const synergy of SYNERGIES) {
+          if (card.name === synergy.leader) {
+            const hasLore = player.lore.some(l => l.name === synergy.lore);
+            if (hasLore) {
+              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              cardScore += bonus;
+            }
+          }
+        }
+        // If no other players need lore, and synergistic lore is available, add bonus for guaranteed future synergy
+        if (competitorsForLore === 0) {
+          for (const synergy of SYNERGIES) {
+            if (card.name === synergy.leader) {
+              const loreAvailable = draft.availableLore.some(l => l.name === synergy.lore);
+              if (loreAvailable) {
+                const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+                cardScore += bonus;
+              }
+            }
+          }
+        }
+      }
       const leadersTakenBefore = Math.min(competitorsForLeader, picksBeforeMyNextTurn);
       const replacementIdx = leadersTakenBefore;
       if (replacementIdx < sortedLeaders.length) {
-        const replacement = sortedLeaders[replacementIdx];
-        opportunityCost = cardScore - getWeightedScore(replacement, "leader");
+        let replacementScore = getWeightedScore(sortedLeaders[replacementIdx], "leader");
+        // Add synergy bonus for replacement
+        if (!player.leader) {
+          for (const synergy of SYNERGIES) {
+            if (sortedLeaders[replacementIdx].name === synergy.leader) {
+              const hasLore = player.lore.some(l => l.name === synergy.lore);
+              if (hasLore) {
+                const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+                replacementScore += bonus;
+              }
+            }
+          }
+          // If no other players need lore, and synergistic lore is available, add bonus for guaranteed future synergy
+          if (competitorsForLore === 0) {
+            for (const synergy of SYNERGIES) {
+              if (sortedLeaders[replacementIdx].name === synergy.leader) {
+                const loreAvailable = draft.availableLore.some(l => l.name === synergy.lore);
+                if (loreAvailable) {
+                  const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+                  replacementScore += bonus;
+                }
+              }
+            }
+          }
+        }
+        opportunityCost = cardScore - replacementScore;
       } else {
         opportunityCost = cardScore;
       }
     } else {
       // Lore: at most (numPlayers - 1) picks happen before my next turn,
       // and at most `competitorsForLore` of those opponents want lore.
+      let cardScore = getWeightedScore(card, "lore");
+      // Add synergy bonus if this lore synergizes with current leader
+      if (player.leader) {
+        for (const synergy of SYNERGIES) {
+          if (player.leader.name === synergy.leader && card.name === synergy.lore) {
+            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+            cardScore += bonus;
+          }
+        }
+      } else if (competitorsForLeader === 0) {
+        // If no other players need leader, and synergistic leader is available, add bonus for guaranteed future synergy
+        for (const synergy of SYNERGIES) {
+          if (card.name === synergy.lore) {
+            const leaderAvailable = draft.availableLeaders.some(l => l.name === synergy.leader);
+            if (leaderAvailable) {
+              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              cardScore += bonus;
+            }
+          }
+        }
+      }
       const loreTakenBefore = Math.min(competitorsForLore, picksBeforeMyNextTurn);
-      const cardScore = getWeightedScore(card, "lore");
       const replacementIdx = loreTakenBefore;
       if (replacementIdx < sortedLore.length) {
-        const replacement = sortedLore[replacementIdx];
-        opportunityCost = cardScore - getWeightedScore(replacement, "lore");
+        let replacementScore = getWeightedScore(sortedLore[replacementIdx], "lore");
+        // Add synergy bonus for replacement
+        if (player.leader) {
+          for (const synergy of SYNERGIES) {
+            if (player.leader.name === synergy.leader && sortedLore[replacementIdx].name === synergy.lore) {
+              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              replacementScore += bonus;
+            }
+          }
+        } else if (competitorsForLeader === 0) {
+          // If no other players need leader, and synergistic leader is available, add bonus for guaranteed future synergy
+          for (const synergy of SYNERGIES) {
+            if (sortedLore[replacementIdx].name === synergy.lore) {
+              const leaderAvailable = draft.availableLeaders.some(l => l.name === synergy.leader);
+              if (leaderAvailable) {
+                const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+                replacementScore += bonus;
+              }
+            }
+          }
+        }
+        opportunityCost = cardScore - replacementScore;
       } else {
         opportunityCost = cardScore;
       }
@@ -1638,11 +1845,25 @@ function renderPlayerBoards() {
     if (player.leader) {
       const imgUrl = player.leader.card ? getImageUrl(player.leader.card) : null;
       const imgTag = imgUrl ? `<img class="player-pick-img" src="${imgUrl}" alt="${player.leader.name}" />` : "";
+      
+      // Check for synergy star
+      let hasSynergy = false;
+      for (const synergy of SYNERGIES) {
+        if (player.leader.name === synergy.leader) {
+          const hasLore = player.lore.some(l => l.name === synergy.lore);
+          if (hasLore) {
+            hasSynergy = true;
+            break;
+          }
+        }
+      }
+      
       picksHTML += `<div class="player-pick">
         ${imgTag}
         <div class="player-pick-details">
           <div class="pick-header">
             <span class="pick-type">Lead</span>
+            ${hasSynergy ? '<span class="synergy-badge-small">★</span>' : ''}
             <span class="tier-badge tier-${player.leader.tier.toLowerCase()}">${player.leader.tier}</span>
             <span class="pick-name">${player.leader.name}</span>
           </div>
@@ -1659,11 +1880,24 @@ function renderPlayerBoards() {
       if (player.lore[j]) {
         const imgUrl = player.lore[j].card ? getImageUrl(player.lore[j].card) : null;
         const imgTag = imgUrl ? `<img class="player-pick-img" src="${imgUrl}" alt="${player.lore[j].name}" />` : "";
+        
+        // Check for synergy star
+        let hasSynergy = false;
+        if (player.leader) {
+          for (const synergy of SYNERGIES) {
+            if (player.leader.name === synergy.leader && player.lore[j].name === synergy.lore) {
+              hasSynergy = true;
+              break;
+            }
+          }
+        }
+        
         picksHTML += `<div class="player-pick">
           ${imgTag}
           <div class="player-pick-details">
             <div class="pick-header">
               <span class="pick-type">Lore</span>
+              ${hasSynergy ? '<span class="synergy-badge-small">★</span>' : ''}
               <span class="tier-badge tier-${player.lore[j].tier.toLowerCase()}">${player.lore[j].tier}</span>
               <span class="pick-name">${player.lore[j].name}</span>
             </div>
@@ -1680,6 +1914,14 @@ function renderPlayerBoards() {
     if (handicap > 0) {
       const handicapBonus = (handicap * draft.leaderWeight).toFixed(1);
       picksHTML += `<div class="player-handicap">Handicapped (${handicap}): +${handicapBonus} pts</div>`;
+    }
+
+    // Add synergy display if applicable
+    const synergyBonus = getSynergyBonus(draft.players[i]);
+    if (synergyBonus !== 0) {
+      const sign = synergyBonus > 0 ? '+' : '';
+      const label = synergyBonus > 0 ? 'Synergies' : 'Anti-synergies';
+      picksHTML += `<div class="player-synergy">${label}: ${sign}${synergyBonus.toFixed(1)} pts</div>`;
     }
 
     board.innerHTML = `
@@ -1738,10 +1980,86 @@ function renderAvailableCards() {
     for (const card of cards) {
       const isRec = best && card.name === best.name && card.pickType === best.pickType;
       const imgUrl = card.card ? getImageUrl(card.card) : null;
-      const score = getWeightedScore(card, card.pickType).toFixed(1);
+      let score = getWeightedScore(card, card.pickType);
+      
+      // Check for synergies
+      let showsSynergy = false;
+      for (const synergy of SYNERGIES) {
+        if ((card.pickType === "leader" && card.name === synergy.leader) || (card.pickType === "lore" && card.name === synergy.lore)) {
+          // Check if the partner card is available or picked
+          let partnerAvailable = false;
+          if (card.pickType === "leader") {
+            // For leader, check if lore is available or picked
+            partnerAvailable = draft.availableLore.some(l => l.name === synergy.lore) || 
+                               draft.players.some(p => p.lore.some(l => l.name === synergy.lore));
+          } else {
+            // For lore, check if leader is available or picked
+            partnerAvailable = draft.availableLeaders.some(l => l.name === synergy.leader) || 
+                               draft.players.some(p => p.leader && p.leader.name === synergy.leader);
+          }
+          if (partnerAvailable) {
+            showsSynergy = true;
+            break;
+          }
+        }
+      }
+      
+      // Add synergy bonus for current drafter
+      const drafter = draft.players[drafterIdx];
+      if (card.pickType === "leader" && !drafter.leader) {
+        // Check if this leader synergizes with any of drafter's lore
+        for (const synergy of SYNERGIES) {
+          if (card.name === synergy.leader) {
+            const hasLore = drafter.lore.some(l => l.name === synergy.lore);
+            if (hasLore) {
+              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              score += bonus;
+            }
+          }
+        }
+      } else if (card.pickType === "lore" && drafter.leader) {
+        // Check if this lore synergizes with drafter's leader
+        for (const synergy of SYNERGIES) {
+          if (drafter.leader.name === synergy.leader && card.name === synergy.lore) {
+            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+            score += bonus;
+          }
+        }
+      }
+      
+      const displayScore = score.toFixed(1);
 
       const div = document.createElement("div");
       div.className = `draft-card draft-${card.pickType}${isRec ? " recommended" : ""}`;
+
+      // Add synergy info to title
+      if (showsSynergy) {
+        let synergyInfo = [];
+        let hasPositive = false;
+        let hasNegative = false;
+        for (const synergy of SYNERGIES) {
+          if (card.pickType === "leader" && card.name === synergy.leader) {
+            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+            const sign = bonus > 0 ? '+' : '';
+            synergyInfo.push(`${sign}${bonus}.0 pts with ${synergy.lore}`);
+            if (bonus > 0) hasPositive = true;
+            else hasNegative = true;
+          } else if (card.pickType === "lore" && card.name === synergy.lore) {
+            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+            const sign = bonus > 0 ? '+' : '';
+            synergyInfo.push(`${sign}${bonus}.0 pts with ${synergy.leader}`);
+            if (bonus > 0) hasPositive = true;
+            else hasNegative = true;
+          }
+        }
+        if (synergyInfo.length > 0) {
+          let label = 'Bonuses';
+          if (hasPositive && !hasNegative) label = 'Synergies';
+          else if (!hasPositive && hasNegative) label = 'Anti-synergies';
+          else if (hasPositive && hasNegative) label = 'Synergies/Anti-synergies';
+          div.title = `${label}: ${synergyInfo.join(', ')}`;
+        }
+      }
 
       let imgHTML = "";
       if (imgUrl) {
@@ -1752,10 +2070,11 @@ function renderAvailableCards() {
 
       div.innerHTML = `
         ${isRec ? '<div class="draft-card-rec-badge">Best</div>' : ""}
+        ${showsSynergy ? '<span class="synergy-badge">★</span>' : ""}
         ${imgHTML}
         <div class="draft-card-info">
           <div class="draft-card-name">${card.name}</div>
-          <div class="draft-card-score">${score} pts · ${card.tier}</div>
+          <div class="draft-card-score">${displayScore} pts · ${card.tier}</div>
         </div>
       `;
 

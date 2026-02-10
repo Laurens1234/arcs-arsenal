@@ -386,6 +386,7 @@
 }
 
 .pool-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -436,6 +437,24 @@
   padding: 1px 4px;
   border-radius: 3px;
   color: #000;
+}
+
+.synergy-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 0.8rem;
+  color: #fff;
+  text-shadow: none;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  padding: 2px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .player-pick .tier-badge {
@@ -678,6 +697,17 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.player-synergy {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--success);
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 /* Available Cards */
 .available-section {
   background: var(--bg-card);
@@ -765,6 +795,40 @@
   font-size: 0.55rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.draft-card .synergy-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 1rem;
+  color: #fff;
+  z-index: 1;
+  text-shadow: none;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  padding: 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.synergy-badge-small {
+  font-size: 0.7rem;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  padding: 1px;
+  width: 12px;
+  height: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 2px;
+}
+.draft-card.draft-leader .synergy-badge {
+  left: 8px;
 }
 
 .draft-card.draft-leader .draft-card-info {
