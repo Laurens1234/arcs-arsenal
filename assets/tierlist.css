@@ -129,6 +129,18 @@
   gap: 0;
 }
 
+.personal-tier-cards.preview-empty-tier {
+  min-height: 160px;
+}
+
+.personal-tier-row.preview-empty-tier-row {
+  min-height: 172px;
+}
+
+.personal-tier-row.preview-empty-tier-row-leaders {
+  min-height: 200px;
+}
+
 .personal-tier-card {
   --card-width: 120px;
   position: relative;
@@ -411,3 +423,12 @@
 .add-tier-btn.tier-d  { background: linear-gradient(135deg, #bfff7f, #a0e060); }
 .add-tier-btn.tier-sss { background: linear-gradient(135deg, #9f7fff, #8060e0); }
 .add-tier-btn.tier-f  { background: linear-gradient(135deg, #7f7f7f, #606060); }
+
+/* Debug drag zones */
+.personal-tier-cards.drag-zone-above {
+  border-top: 3px solid red !important;
+}
+
+.personal-tier-cards.drag-zone-end {
+  border-right: 3px solid red !important;
+}
