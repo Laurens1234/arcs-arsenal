@@ -20,6 +20,7 @@ const el = {
   themeToggle: document.getElementById("themeToggle"),
   downloadBtn: document.getElementById("downloadBtn"),
   editBtn: document.getElementById("editBtn"),
+  clearBtn: document.getElementById("clearBtn"),
   importBtn: document.getElementById("importBtn"),
   exportBtn: document.getElementById("exportBtn"),
   shareBtn: document.getElementById("shareBtn"),
@@ -72,6 +73,9 @@ let touchDraggedClone = null;
 let touchStartX = 0;
 let touchStartY = 0;
 let touchMoved = false;
+
+// Mouse drag preview
+let dragPreviewElement = null;
 
 // ========== Utilities ==========
 function setStatus(msg, { isError = false } = {}) {
@@ -271,8 +275,9 @@ function buildTierListHTML(entries, container, type, sectionName) {
   for (const tier of TIER_ORDER) {
     grouped.set(tier, []);
   }
+  grouped.set("Unranked", []);
   for (const entry of entries) {
-    const t = TIER_ORDER.includes(entry.tier) ? entry.tier : "D";
+    const t = TIER_ORDER.includes(entry.tier) ? entry.tier : entry.tier === "Unranked" ? "Unranked" : "D";
     grouped.get(t).push(entry);
   }
 
@@ -330,29 +335,6 @@ function buildTierListHTML(entries, container, type, sectionName) {
     cardsDiv.addEventListener("dragover", (e) => {
       if (!editMode) return;
       e.preventDefault();
-      cardsDiv.classList.add("drag-over");
-    });
-    cardsDiv.addEventListener("dragleave", () => {
-      cardsDiv.classList.remove("drag-over");
-    });
-    cardsDiv.addEventListener("drop", (e) => {
-      if (!editMode) return;
-      e.preventDefault();
-      e.stopPropagation();
-      cardsDiv.classList.remove("drag-over");
-      const cardName = e.dataTransfer.getData("text/plain");
-      const srcType = e.dataTransfer.getData("application/x-type");
-      if (srcType !== type) return; // don't mix leaders/lore
-      
-      // Check if dropping on a card or drop zone
-      const target = e.target.closest('.personal-tier-card, .card-drop-zone');
-      if (target) {
-        // Already handled by individual card/zone handlers
-        return;
-      }
-      
-      // Dropping on empty space in the tier - add to end
-      moveCard(cardName, tier, type);
     });
 
     for (let i = 0; i < items.length; i++) {
@@ -368,25 +350,48 @@ function buildTierListHTML(entries, container, type, sectionName) {
         dropZone.dataset.tier = tier;
         dropZone.dataset.type = type;
         
-        dropZone.addEventListener("dragover", (e) => {
-          if (!editMode) return;
-          e.preventDefault();
-          dropZone.classList.add("drag-over");
-        });
-        dropZone.addEventListener("dragleave", () => {
-          dropZone.classList.remove("drag-over");
-        });
-        dropZone.addEventListener("drop", (e) => {
-          if (!editMode) return;
-          e.preventDefault();
-          e.stopPropagation();
-          dropZone.classList.remove("drag-over");
-          const cardName = e.dataTransfer.getData("text/plain");
-          const srcType = e.dataTransfer.getData("application/x-type");
-          if (srcType !== type) return; // don't mix leaders/lore
-          const insertBefore = dropZone.dataset.insertBefore;
-          moveCard(cardName, tier, type, insertBefore);
-        });
+        cardsDiv.appendChild(dropZone);
+      }
+    }
+
+    row.appendChild(label);
+    row.appendChild(cardsDiv);
+    container.appendChild(row);
+  }
+
+  // Show Unranked tier if it has cards OR if in edit mode
+  const unrankedItems = grouped.get("Unranked");
+  if (unrankedItems.length > 0 || editMode) {
+    const row = document.createElement("div");
+    row.className = "personal-tier-row";
+
+    const label = document.createElement("div");
+    label.className = `personal-tier-label tier-unranked`;
+    label.textContent = "";
+
+    const cardsDiv = document.createElement("div");
+    cardsDiv.className = "personal-tier-cards";
+    cardsDiv.dataset.tier = "Unranked";
+    cardsDiv.dataset.type = type;
+
+    // Drag & drop targets (always set up, only active in edit mode)
+    cardsDiv.addEventListener("dragover", (e) => {
+      if (!editMode) return;
+      e.preventDefault();
+    });
+
+    for (let i = 0; i < unrankedItems.length; i++) {
+      const entry = unrankedItems[i];
+      const cardEl = createCardElement(entry, type);
+      cardsDiv.appendChild(cardEl);
+      
+      // Add drop zone after each card (except the last one) in edit mode
+      if (editMode && i < unrankedItems.length - 1) {
+        const dropZone = document.createElement("div");
+        dropZone.className = "card-drop-zone";
+        dropZone.dataset.insertBefore = unrankedItems[i + 1].name;
+        dropZone.dataset.tier = "Unranked";
+        dropZone.dataset.type = type;
         
         cardsDiv.appendChild(dropZone);
       }
@@ -451,10 +456,44 @@ function createCardElement(entry, type) {
     if (!editMode) { e.preventDefault(); return; }
     e.dataTransfer.setData("text/plain", entry.name);
     e.dataTransfer.setData("application/x-type", type);
-    cardEl.classList.add("dragging");
+    // Remove opacity from original card immediately
+    cardEl.style.opacity = "0";
+    
+    // Create drag preview first
+    dragPreviewElement = cardEl.cloneNode(true);
+    dragPreviewElement.className = "personal-tier-card drag-preview";
+    dragPreviewElement.style.position = "fixed";
+    dragPreviewElement.style.pointerEvents = "none";
+    dragPreviewElement.style.zIndex = "1000";
+    dragPreviewElement.style.opacity = "0.5";
+    dragPreviewElement.style.transform = "scale(0.95)";
+    document.body.appendChild(dragPreviewElement);
+    
+    // Calculate initial insertion point and position preview immediately
+    const container = cardEl.closest('.personal-tier-cards');
+    if (container) {
+      // Position preview at the dragged card's original position
+      const draggedCardRect = cardEl.getBoundingClientRect();
+      dragPreviewElement.style.left = `${draggedCardRect.left}px`;
+      dragPreviewElement.style.top = `${draggedCardRect.top}px`;
+      dragPreviewElement.style.display = "block";
+      
+      // Don't set currentDragInsertion initially - let the first dragover determine it
+    }
   });
   cardEl.addEventListener("dragend", () => {
-    cardEl.classList.remove("dragging");
+    // Restore opacity to original card
+    cardEl.style.opacity = "";
+    // Clean up drag preview
+    if (dragPreviewElement && dragPreviewElement.parentNode) {
+      dragPreviewElement.parentNode.removeChild(dragPreviewElement);
+    }
+    dragPreviewElement = null;
+    // Clear any remaining shifted cards
+    document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
+      card.classList.remove('shifted-right', 'shifted-left');
+    });
+    currentDragInsertion = null;
   });
   
   // Touch drag support for mobile devices
@@ -571,25 +610,6 @@ function createCardElement(entry, type) {
     touchMoved = false;
   });
   
-  // Drop target (for inserting before this card)
-  cardEl.addEventListener("dragover", (e) => {
-    if (!editMode) return;
-    e.preventDefault();
-    cardEl.classList.add("drag-over");
-  });
-  cardEl.addEventListener("dragleave", () => {
-    cardEl.classList.remove("drag-over");
-  });
-  cardEl.addEventListener("drop", (e) => {
-    if (!editMode) return;
-    e.preventDefault();
-    e.stopPropagation();
-    cardEl.classList.remove("drag-over");
-    const cardName = e.dataTransfer.getData("text/plain");
-    const srcType = e.dataTransfer.getData("application/x-type");
-    if (srcType !== type || cardName === entry.name) return; // don't mix leaders/lore or drop on self
-    moveCard(cardName, entry.tier, type, entry.name);
-  });
 
   const imgUrl = entry.card ? getImageUrl(entry.card) : null;
 
@@ -643,6 +663,272 @@ function createCardElement(entry, type) {
 
   return cardEl;
 }
+
+// ========== Proximity-based Drag & Drop ==========
+
+// Track current drag state
+let currentDragInsertion = null;
+
+function findClosestInsertionPoint(mouseX, mouseY) {
+  if (!editMode) return null;
+
+  // Use grid-based detection instead of proximity
+  // Check all tier containers
+  const tierContainers = document.querySelectorAll('.personal-tier-cards');
+  for (const container of tierContainers) {
+    const containerRect = container.getBoundingClientRect();
+
+    // Check if mouse is within this container's bounds (with some padding)
+    if (mouseX >= containerRect.left - 50 && mouseX <= containerRect.right + 50 &&
+        mouseY >= containerRect.top - 20 && mouseY <= containerRect.bottom + 20) {
+
+      const cards = Array.from(container.querySelectorAll('.personal-tier-card'));
+      const type = container.dataset.type;
+      const tier = container.dataset.tier;
+
+      // Create a grid of insertion points
+      const insertionPoints = [];
+
+      if (cards.length === 0) {
+        // Empty tier - single insertion point
+        insertionPoints.push({
+          x: containerRect.left + 6,
+          y: containerRect.top + 6,
+          insertBefore: null,
+          cardsAfterIndex: 0
+        });
+      } else {
+        // Create insertion points before, between, and after cards
+        for (let i = 0; i <= cards.length; i++) {
+          let insertX, insertY, insertBefore;
+
+          if (i === 0) {
+            // Before first card
+            const firstCardRect = cards[0].getBoundingClientRect();
+            insertX = firstCardRect.left - 60;
+            insertY = firstCardRect.top;
+            const cardName = cards[0].dataset.name;
+            const entry = allCards.find(c => c.name === cardName);
+            insertBefore = entry ? entry.name : null;
+          } else if (i === cards.length) {
+            // After last card
+            const lastCardRect = cards[cards.length - 1].getBoundingClientRect();
+            insertX = lastCardRect.right + 60;
+            insertY = lastCardRect.top;
+            insertBefore = null;
+          } else {
+            // Between cards i-1 and i
+            const prevCardRect = cards[i-1].getBoundingClientRect();
+            const nextCardRect = cards[i].getBoundingClientRect();
+            insertX = (prevCardRect.right + nextCardRect.left) / 2;
+            insertY = prevCardRect.top;
+            const cardName = cards[i].dataset.name;
+            const entry = allCards.find(c => c.name === cardName);
+            insertBefore = entry ? entry.name : null;
+          }
+
+          insertionPoints.push({
+            x: insertX,
+            y: insertY,
+            insertBefore,
+            cardsAfterIndex: i
+          });
+        }
+      }
+
+      // Group insertion points by row (Y coordinate) to prevent cross-row jumping
+      const pointsByRow = new Map();
+      for (const point of insertionPoints) {
+        const rowY = Math.round(point.y); // Round to handle minor positioning differences
+        if (!pointsByRow.has(rowY)) {
+          pointsByRow.set(rowY, []);
+        }
+        pointsByRow.get(rowY).push(point);
+      }
+
+      // Find which row the mouse is in
+      let closestRowY = null;
+      let minRowDistance = Infinity;
+      for (const rowY of pointsByRow.keys()) {
+        const rowDistance = Math.abs(mouseY - rowY);
+        if (rowDistance < minRowDistance) {
+          minRowDistance = rowDistance;
+          closestRowY = rowY;
+        }
+      }
+
+      // Only consider insertion points in the closest row
+      const rowPoints = pointsByRow.get(closestRowY) || insertionPoints;
+
+      // Find the closest insertion point horizontally within the row
+      // Prefer "between" insertion points when they are reasonably close
+      let closestPoint = null;
+      let closestDistance = Infinity;
+      let closestBetweenPoint = null;
+      let closestBetweenDistance = Infinity;
+
+      for (const point of rowPoints) {
+        const distance = Math.abs(mouseX - point.x);
+        
+        // Check if this is a "between" insertion point (has insertBefore set to a card name)
+        if (point.insertBefore !== null && point.insertBefore !== undefined && point.insertBefore !== '') {
+          if (distance < closestBetweenDistance) {
+            closestBetweenDistance = distance;
+            closestBetweenPoint = point;
+          }
+        } else {
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestPoint = point;
+          }
+        }
+      }
+
+      // Prefer between points if they are within 100px (roughly the width of a card + gap)
+      if (closestBetweenPoint && closestBetweenDistance < 100) {
+        closestPoint = closestBetweenPoint;
+      } else if (!closestPoint && closestBetweenPoint) {
+        closestPoint = closestBetweenPoint;
+      }
+
+      if (closestPoint) {
+        return {
+          x: closestPoint.x,
+          y: closestPoint.y,
+          container,
+          insertBefore: closestPoint.insertBefore,
+          type,
+          tier,
+          cardsAfterIndex: closestPoint.cardsAfterIndex
+        };
+      }
+    }
+  }
+
+  // Fallback: find the closest container and use its first insertion point
+  let closestContainer = null;
+  let minDistance = Infinity;
+
+  for (const container of tierContainers) {
+    const containerRect = container.getBoundingClientRect();
+    const centerX = (containerRect.left + containerRect.right) / 2;
+    const centerY = (containerRect.top + containerRect.bottom) / 2;
+    const distance = Math.sqrt((mouseX - centerX) ** 2 + (mouseY - centerY) ** 2);
+
+    if (distance < minDistance) {
+      minDistance = distance;
+      closestContainer = container;
+    }
+  }
+
+  if (closestContainer) {
+    const cards = Array.from(closestContainer.querySelectorAll('.personal-tier-card'));
+    const containerRect = closestContainer.getBoundingClientRect();
+
+    if (cards.length === 0) {
+      return {
+        x: containerRect.left + 6,
+        y: containerRect.top + 6,
+        container: closestContainer,
+        insertBefore: null,
+        type: closestContainer.dataset.type,
+        tier: closestContainer.dataset.tier,
+        cardsAfterIndex: 0
+      };
+    } else {
+      // Use the first insertion point (before first card)
+      const firstCardRect = cards[0].getBoundingClientRect();
+      const cardName = cards[0].dataset.name;
+      const entry = allCards.find(c => c.name === cardName);
+      return {
+        x: firstCardRect.left - 60,
+        y: firstCardRect.top,
+        container: closestContainer,
+        insertBefore: entry ? entry.name : null,
+        type: closestContainer.dataset.type,
+        tier: closestContainer.dataset.tier,
+        cardsAfterIndex: 0
+      };
+    }
+  }
+
+  return null; // Should never happen
+}
+
+function updateDragPreview(insertion) {
+  if (!insertion || !dragPreviewElement) return;
+
+  // Position preview
+  dragPreviewElement.style.left = `${insertion.x - 60}px`; // Center the 120px card on the insertion point
+  dragPreviewElement.style.top = `${insertion.y}px`;
+  dragPreviewElement.style.display = "block";
+
+  // Clear all shifting from all containers first
+  document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
+    card.classList.remove('shifted-right', 'shifted-left');
+  });
+
+  // Update shifting for the current insertion point
+  const container = insertion.container;
+  const cards = Array.from(container.querySelectorAll('.personal-tier-card'));
+  
+  // Only shift cards in the same row as the insertion point
+  const insertionRowY = Math.round(insertion.y);
+  for (let i = insertion.cardsAfterIndex; i < cards.length; i++) {
+    const cardRect = cards[i].getBoundingClientRect();
+    const cardRowY = Math.round(cardRect.top);
+    if (cardRowY === insertionRowY) {
+      cards[i].classList.add('shifted-right');
+    }
+  }
+
+  currentDragInsertion = insertion;
+}
+
+// Global dragover handler
+let lastDragUpdate = 0;
+document.addEventListener("dragover", (e) => {
+  if (!editMode || !dragPreviewElement) return;
+
+  const now = Date.now();
+  if (now - lastDragUpdate < 16) return; // Throttle to ~60fps
+  lastDragUpdate = now;
+
+  const insertion = findClosestInsertionPoint(e.clientX, e.clientY);
+  if (insertion) {
+    e.preventDefault();
+    updateDragPreview(insertion);
+  } else {
+    // No valid insertion point found - clear all shifting
+    dragPreviewElement.style.display = "none";
+    document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
+      card.classList.remove('shifted-right', 'shifted-left');
+    });
+    currentDragInsertion = null;
+  }
+});
+
+// Global drop handler
+document.addEventListener("drop", (e) => {
+  if (!editMode || !currentDragInsertion) return;
+
+  e.preventDefault();
+  const cardName = e.dataTransfer.getData("text/plain");
+  const srcType = e.dataTransfer.getData("application/x-type");
+
+  if (srcType !== currentDragInsertion.type) return; // don't mix leaders/lore
+
+  // Clean up visual effects first
+  dragPreviewElement.style.display = "none";
+  document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
+    card.classList.remove('shifted-right', 'shifted-left');
+  });
+
+  // Then move the card
+  moveCard(cardName, currentDragInsertion.tier, currentDragInsertion.type, currentDragInsertion.insertBefore);
+
+  currentDragInsertion = null;
+});
 
 function moveCard(name, newTier, type, insertBefore = null) {
   const entries = type === "leaders" ? (currentLeaderTab === '3p' ? leaderEntries3P : leaderEntries4P) : type === "lore" ? loreEntries : basecourtEntries;
@@ -751,6 +1037,7 @@ function toggleEditMode() {
   editMode = !editMode;
   document.body.classList.toggle("edit-mode", editMode);
   el.editBtn.textContent = editMode ? "✅ Done" : "Edit";
+  el.clearBtn.style.display = editMode ? "" : "none";
   el.importBtn.style.display = editMode ? "" : "none";
   el.exportBtn.style.display = editMode ? "" : "none";
   el.shareBtn.style.display = editMode ? "" : "none";
@@ -761,9 +1048,102 @@ function toggleEditMode() {
   rebuildCurrentView();
 }
 
+async function loadCardsFromYAML(type) {
+  // Use already loaded cards if available, otherwise load them
+  let cards = allCards;
+  if (cards.length === 0) {
+    const text = await fetchText(CONFIG.cardsYamlUrl);
+    const loadedCards = yaml.load(text);
+    if (!Array.isArray(loadedCards)) throw new Error("Invalid YAML format");
+    cards = loadedCards.map((c) => ({
+      id: c.id ?? null,
+      name: c.name ?? "",
+      image: c.image ?? null,
+      tags: Array.isArray(c.tags) ? c.tags : [],
+      text: c.text ?? "",
+    }));
+  }
+  
+  // Filter cards by type
+  let filteredCards;
+  if (type === 'leaders') {
+    filteredCards = cards.filter(card => card.tags && card.tags.includes('Leader'));
+  } else if (type === 'lore') {
+    filteredCards = cards.filter(card => card.tags && card.tags.includes('Lore'));
+  } else if (type === 'basecourt') {
+    filteredCards = cards.filter(card => card.tags && card.tags.includes('Base Court'));
+  }
+  
+  // Sort by ID number (extract number from ID like ARCS-L01 -> 1, ARCS-LEAD01 -> 1, ARCS-BC01 -> 1)
+  filteredCards.sort((a, b) => {
+    const aMatch = a.id && a.id.match(/ARCS-(?:L|LEAD|BC)(\d+)/);
+    const bMatch = b.id && b.id.match(/ARCS-(?:L|LEAD|BC)(\d+)/);
+    const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+    const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+    return aNum - bNum;
+  });
+  
+  return filteredCards;
+}
+
+function clearTierList() {
+  // Determine which section is currently visible
+  const activeTab = Array.from(el.tabs).find(tab => tab.classList.contains('active'));
+  const activeSubTab = Array.from(el.subTabs).find(subTab => subTab.classList.contains('active'));
+  
+  let targetType, targetEntries;
+  if (activeTab.dataset.tab === 'leaders') {
+    targetType = 'leaders';
+    if (activeSubTab.dataset.subtab === '3p') {
+      targetEntries = leaderEntries3P;
+    } else {
+      targetEntries = leaderEntries4P;
+    }
+  } else if (activeTab.dataset.tab === 'lore') {
+    targetType = 'lore';
+    targetEntries = loreEntries;
+  } else if (activeTab.dataset.tab === 'basecourt') {
+    targetType = 'basecourt';
+    targetEntries = basecourtEntries;
+  }
+  
+  // Load cards from YAML in original order
+  loadCardsFromYAML(targetType).then(cards => {
+    // Clear existing entries
+    targetEntries.length = 0;
+    
+    // Add cards in YAML order, all set to "Unranked" tier
+    for (const card of cards) {
+      targetEntries.push({
+        name: card.name,
+        tier: "Unranked",
+        card: card,
+      });
+    }
+    
+    // Make sure only S-D tiers are visible as empty rows, hide others
+    visibleEmptyTiers.clear();
+    hiddenTiers.clear();
+    
+    // Show S, A, B, C, D as empty rows
+    const visibleTiers = ["S", "A", "B", "C", "D"];
+    for (const tier of visibleTiers) {
+      visibleEmptyTiers.add(tier);
+    }
+    
+    // Hide SSS, SS, F
+    const hiddenTierList = ["SSS", "SS", "F"];
+    for (const tier of hiddenTierList) {
+      hiddenTiers.add(tier);
+    }
+    
+    rebuildCurrentView();
+  });
+}
+
 // ========== Export ==========
 function entriesToCsv(leaders3P, leaders4P, lore, basecourt) {
-  const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F"];
+  const TIER_ORDER = ["SSS", "SS", "S", "A", "B", "C", "D", "F", "Unranked"];
   
   // Group 3P leaders by tier
   const leader3PGroups = new Map();
@@ -1150,8 +1530,8 @@ function initDownload() {
 }
 
 // ========== URL Sharing ==========
-const TIER_MAP = { 'SSS': '0', 'SS': '1', 'S': '2', 'A': '3', 'B': '4', 'C': '5', 'D': '6', 'F': '7' };
-const REVERSE_TIER_MAP = { '0': 'SSS', '1': 'SS', '2': 'S', '3': 'A', '4': 'B', '5': 'C', '6': 'D', '7': 'F' };
+const TIER_MAP = { 'SSS': '0', 'SS': '1', 'S': '2', 'A': '3', 'B': '4', 'C': '5', 'D': '6', 'F': '7', 'Unranked': '8' };
+const REVERSE_TIER_MAP = { '0': 'SSS', '1': 'SS', '2': 'S', '3': 'A', '4': 'B', '5': 'C', '6': 'D', '7': 'F', '8': 'Unranked' };
 
 function encodeTierListForURL(selectedSections) {
   // Build card index map for compression
@@ -1462,6 +1842,7 @@ async function init() {
 
   // Edit mode
   el.editBtn.addEventListener("click", toggleEditMode);
+  el.clearBtn.addEventListener("click", clearTierList);
   el.exportBtn.addEventListener("click", openExportModal);
   el.importBtn.addEventListener("click", openImportModal);
   el.shareBtn.addEventListener("click", shareTierList);
