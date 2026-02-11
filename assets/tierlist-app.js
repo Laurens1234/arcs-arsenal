@@ -1634,6 +1634,57 @@ function initTabs() {
     basecourt: el.basecourtSection,
   };
 
+  // Function to update URL hash based on current tab
+  function updateHash() {
+    const activeTab = Array.from(el.tabs).find(tab => tab.classList.contains('active'));
+    if (!activeTab) return;
+    
+    const tabName = activeTab.dataset.tab;
+    if (tabName === 'leaders') {
+      const activeSubTab = Array.from(el.subTabs).find(subTab => subTab.classList.contains('active'));
+      const subTabName = activeSubTab ? activeSubTab.dataset.subtab : '3p';
+      window.location.hash = `#${tabName}-${subTabName}`;
+    } else {
+      window.location.hash = `#${tabName}`;
+    }
+  }
+
+  // Function to set tab from hash
+  function setTabFromHash() {
+    const hash = window.location.hash.substring(1); // remove #
+    if (!hash) return;
+    
+    const [tabName, subTab] = hash.split('-');
+    
+    // Find and activate main tab
+    const targetTab = Array.from(el.tabs).find(tab => tab.dataset.tab === tabName);
+    if (targetTab && !targetTab.classList.contains('disabled')) {
+      el.tabs.forEach((t) => t.classList.remove("active"));
+      targetTab.classList.add("active");
+      
+      if (tabName === 'leaders') {
+        el.leaderSubTabs.style.display = '';
+        // Set sub-tab
+        const targetSub = subTab || '3p';
+        const targetSubTab = Array.from(el.subTabs).find(subTab => subTab.dataset.subtab === targetSub);
+        if (targetSubTab && !targetSubTab.classList.contains('disabled')) {
+          el.subTabs.forEach((t) => t.classList.remove("active"));
+          targetSubTab.classList.add("active");
+          currentLeaderTab = targetSub;
+        }
+        const sectionKey = currentLeaderTab === '3p' ? 'leaders3p' : 'leaders4p';
+        Object.entries(sections).forEach(([key, section]) => {
+          section.classList.toggle("hidden", key !== sectionKey);
+        });
+      } else {
+        el.leaderSubTabs.style.display = 'none';
+        Object.entries(sections).forEach(([key, section]) => {
+          section.classList.toggle("hidden", key !== tabName);
+        });
+      }
+    }
+  }
+
   el.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
       // Don't allow clicking disabled tabs
@@ -1657,6 +1708,8 @@ function initTabs() {
           section.classList.toggle("hidden", key !== target);
         });
       }
+      
+      updateHash();
     });
   });
 
@@ -1675,6 +1728,8 @@ function initTabs() {
       Object.entries(sections).forEach(([key, section]) => {
         section.classList.toggle("hidden", key !== sectionKey);
       });
+      
+      updateHash();
     });
   });
 
@@ -1682,6 +1737,15 @@ function initTabs() {
   if (el.tabs[0].classList.contains('active') && el.tabs[0].dataset.tab === 'leaders') {
     el.leaderSubTabs.style.display = '';
   }
+  
+  // Set initial tab from hash
+  setTabFromHash();
+  
+  // Update hash to reflect current state (in case no hash was set)
+  updateHash();
+  
+  // Listen for hash changes (e.g., back/forward buttons)
+  window.addEventListener('hashchange', setTabFromHash);
 }
 
 function disableEmptyTabs() {
