@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arcs Data</title>
+    <meta name="description" content="Arcs cards ranked with win rates and pick statistics." />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Arcs Data" />
+    <meta property="og:description" content="Arcs cards ranked with win rates and pick statistics." />
+    <meta property="og:image" content="./favicon.svg" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Arcs Data" />
+    <meta name="twitter:description" content="Arcs cards ranked with win rates and pick statistics." />
+    <meta name="twitter:image" content="./favicon.svg" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+      .data-source-bar {
+        padding: 10px 0;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+      }
+      .data-source-toggle {
+        display: flex;
+        gap: 4px;
+      }
+      .data-source-toggle.hidden { display: none; }
+      .ds-btn {
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .ds-btn:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .ds-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header-inner">
+        <div>
+          <h1 class="logo"><a href="./index" style="text-decoration:none;color:inherit">Arcs Data</a></h1>
+          <p class="tagline" id="pageTagline">Arcs card rankings with win rates and pick statistics</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container">
+        <div class="tabs">
+          <button class="tab active" data-tab="leaders">Leaders</button>
+          <button class="tab" data-tab="lore">Lore</button>
+          <button class="tab" data-tab="all">All Cards</button>
+        </div>
+        <div class="controls">
+          <button id="compareBtn" class="btn-compare">Compare</button>
+          <select id="metric" class="select">
+            <option value="winRate">Win Rate %</option>
+            <option value="wins">Total Wins</option>
+            <option value="timesPicked">Times Picked</option>
+            <option value="draftRank" class="Community-only">Draft Rank</option>
+          </select>
+          <input id="query" type="search" class="search" placeholder="Search…" />
+          <a href="./index" class="btn-compare">← Home</a>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Data Source Toggle -->
+    <div class="data-source-bar">
+      <div class="container" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:0.85rem;font-weight:600;color:var(--text-muted)">Data Source:</span>
+        <div class="data-source-toggle" id="dataSourceGroup">
+          <button class="ds-btn active" data-value="league">League</button>
+          <button class="ds-btn" data-value="Community">Community</button>
+        </div>
+        <div class="data-source-toggle hidden" id="playerCountGroup">
+          <button class="ds-btn" data-value="3p">3P (983 games)</button>
+          <button class="ds-btn active" data-value="4p">4P (1272 games)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compare Panel -->
+    <div id="comparePanel" class="compare-panel hidden">
+      <div class="container">
+        <div class="compare-header">
+          <h3>Compare Cards</h3>
+          <button id="closeCompare" class="btn-close">✕</button>
+        </div>
+        <p class="compare-hint">Select up to 2 cards to compare</p>
+        <div id="compareSlots" class="compare-slots">
+          <div class="compare-slot empty" data-slot="0">
+            <span>Select a card</span>
+          </div>
+          <div class="compare-vs">VS</div>
+          <div class="compare-slot empty" data-slot="1">
+            <span>Select a card</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="main">
+      <div class="container">
+        <div id="status" class="status"></div>
+        
+        <section id="leadersSection" class="section">
+          <!-- Leaders Insights -->
+          <div class="insights-grid section-insights">
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 class="insight-title">Win Rate vs Popularity</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing each leader's win rate vs how often they're picked. Dashed lines show averages. Cards in the top-left are hidden gems (high WR, low picks). Cards in the bottom-right are overrated (low WR, high picks).">?</button>
+              </div>
+              <p class="insight-subtitle">Do popular leaders actually win?</p>
+              <div id="leaderScatterChart" class="scatter-chart"></div>
+            </div>
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 id="leaderHistogramTitle" class="insight-title">Win Rate Distribution</h4>
+                <button id="leaderHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed. In a 4-player game, 25% is expected average. Bars show how many cards fall into each win rate bracket.">?</button>
+              </div>
+              <p id="leaderHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
+              <div id="leaderHistogram" class="histogram-chart"></div>
+            </div>
+            <div class="insight-card">
+              <div class="insight-header">
+                <h4 class="insight-title">Leader Analysis</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to leader averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
+              </div>
+              <div id="leaderAnalysis" class="card-analysis"></div>
+            </div>
+          </div>
+          <!-- Tier List -->
+          <div class="tier-list-container">
+            <div class="tier-list-header">
+              <h4 class="tier-list-title">Performance Tiers</h4>
+              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
+            </div>
+            <div id="leaderTierList" class="tier-list"></div>
+          </div>
+          <div id="leaderCards" class="card-grid"></div>
+        </section>
+
+        <section id="loreSection" class="section hidden">
+          <!-- Lore Insights -->
+          <div class="insights-grid section-insights">
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 class="insight-title">Win Rate vs Popularity</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing each lore card's win rate vs how often it's picked. Dashed lines show averages. Cards in the top-left are hidden gems (high WR, low picks). Cards in the bottom-right are overrated (low WR, high picks).">?</button>
+              </div>
+              <p class="insight-subtitle">Do popular lore cards actually win?</p>
+              <div id="loreScatterChart" class="scatter-chart"></div>
+            </div>
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 id="loreHistogramTitle" class="insight-title">Win Rate Distribution</h4>
+                <button id="loreHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed. In a 4-player game, 25% is expected average. Bars show how many cards fall into each win rate bracket.">?</button>
+              </div>
+              <p id="loreHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
+              <div id="loreHistogram" class="histogram-chart"></div>
+            </div>
+            <div class="insight-card">
+              <div class="insight-header">
+                <h4 class="insight-title">Lore Analysis</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to lore averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
+              </div>
+              <div id="loreAnalysis" class="card-analysis"></div>
+            </div>
+          </div>
+          <!-- Tier List -->
+          <div class="tier-list-container">
+            <div class="tier-list-header">
+              <h4 class="tier-list-title">Performance Tiers</h4>
+              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
+            </div>
+            <div id="loreTierList" class="tier-list"></div>
+          </div>
+          <div id="loreCards" class="card-grid"></div>
+        </section>
+
+        <section id="allSection" class="section hidden">
+          <!-- All Cards Insights -->
+          <div class="insights-grid section-insights">
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 class="insight-title">Win Rate vs Popularity</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Scatter plot showing all cards' win rate vs how often they're picked. Leaders are teal, Lore are purple. Dashed lines show averages.">?</button>
+              </div>
+              <p class="insight-subtitle">Leaders vs Lore performance</p>
+              <div id="allScatterChart" class="scatter-chart"></div>
+            </div>
+            <div class="insight-card insight-chart">
+              <div class="insight-header">
+                <h4 id="allHistogramTitle" class="insight-title">Win Rate Distribution</h4>
+                <button id="allHistogramHelp" class="help-btn" aria-label="Help" data-tooltip="Histogram showing how win rates are distributed across all cards. In a 4-player game, 25% is expected average.">?</button>
+              </div>
+              <p id="allHistogramSubtitle" class="insight-subtitle">How spread out are the win rates?</p>
+              <div id="allHistogram" class="histogram-chart"></div>
+            </div>
+            <div class="insight-card">
+              <div class="insight-header">
+                <h4 class="insight-title">Overall Analysis</h4>
+                <button class="help-btn" aria-label="Help" data-tooltip="Categories based on comparison to averages:&#10;&#10;💎 Hidden Gem: Win rate > average AND picks < average&#10;📉 Overrated: Win rate < average AND picks > average&#10;🔥 Meta: Win rate > average AND picks > average&#10;&#10;Shows top 3 in each category, sorted by win rate.">?</button>
+              </div>
+              <div id="allAnalysis" class="card-analysis"></div>
+            </div>
+          </div>
+          <!-- Tier List -->
+          <div class="tier-list-container">
+            <div class="tier-list-header">
+              <h4 class="tier-list-title">Performance Tiers (All Cards)</h4>
+              <button class="help-btn" aria-label="Help" data-tooltip="Tiers based on win rate percentile across all cards:&#10;&#10;S Tier: Top 10% (exceptional)&#10;A Tier: Top 10-30% (strong)&#10;B Tier: Middle 30-70% (average)&#10;C Tier: Bottom 30-10% (weak)&#10;D Tier: Bottom 10% (struggling)">?</button>
+            </div>
+            <div id="allTierList" class="tier-list"></div>
+          </div>
+          <div id="allCards" class="card-grid"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Card Modal -->
+    <div id="cardModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <button class="modal-close">✕</button>
+        <div class="modal-body">
+          <div class="modal-image">
+            <img id="modalImg" src="" alt="" />
+          </div>
+          <div class="modal-info">
+            <h2 id="modalName" class="modal-name"></h2>
+            <div id="modalStats" class="modal-stats"></div>
+            <div id="modalText" class="modal-text"></div>
+            <button id="modalShareBtn" class="btn-compare">🔗 Share</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="container">
+        <p>Based on <span id="totalGames">0</span> games · <span id="dataSourceLabel">Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a></span> · Card images from <a href="https://github.com/buriedgiantstudios/cards" target="_blank">buriedgiantstudios/cards</a> · <a href="./custom-cards">Custom Cards</a> · <a href="./index">Home</a></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>

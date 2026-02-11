@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Arcs Data</title>
+    <meta name="description" content="Arcs cards ranked with win rates and pick statistics." />
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Arcs Data" />
+    <meta property="og:description" content="Arcs cards ranked with win rates and pick statistics." />
+    <meta property="og:image" content="./favicon.svg" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Arcs Arsenal - Rankings" />
+    <meta name="twitter:description" content="Arcs cards ranked with win rates and pick statistics." />
+    <meta name="twitter:image" content="./favicon.svg" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./assets/style.css" />
+    <style>
+      .data-source-bar {
+        padding: 10px 0;
+        background: var(--bg-card);
+        border-bottom: 1px solid var(--border);
+      }
+      .data-source-toggle {
+        display: flex;
+        gap: 4px;
+      }
+      .data-source-toggle.hidden { display: none; }
+      .ds-btn {
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: transparent;
+        color: var(--text-muted);
+        font-family: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .ds-btn:hover {
+        border-color: var(--accent);
+        color: var(--text);
+      }
+      .ds-btn.active {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #000;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <header class="header">
+      <div class="container header-inner">
+        <div>
+          <h1 class="logo"><a href="./index" style="text-decoration:none;color:inherit">Arcs Data</a></h1>
+          <p class="tagline">View my personal rankings and create &amp; share your own tier lists</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container">
+        <div class="tabs">
+          <div class="main-tabs">
+            <button class="tab active" data-tab="leaders">Leaders</button>
+            <button class="tab" data-tab="lore">Lore</button>
+            <button class="tab" data-tab="basecourt">Base Court</button>
+          </div>
+          <div class="sub-tabs" id="leaderSubTabs">
+            <button class="sub-tab active" data-subtab="3p">3P</button>
+            <button class="sub-tab" data-subtab="4p">4P</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Data Source Toggle -->
+    <div class="data-source-bar">
+      <div class="container" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:0.85rem;font-weight:600;color:var(--text-muted)">Data Source:</span>
+        <div class="data-source-toggle" id="dataSourceGroup">
+          <button class="ds-btn active" data-value="league">League</button>
+          <button class="ds-btn" data-value="Community">Community</button>
+        </div>
+        <div class="data-source-toggle hidden" id="playerCountGroup">
+          <button class="ds-btn" data-value="3p">3P (983 games)</button>
+          <button class="ds-btn active" data-value="4p">4P (1272 games)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compare Panel -->
+    <div id="comparePanel" class="compare-panel hidden">
+      <div class="container">
+        <div class="compare-header">
+          <h3>Compare Cards</h3>
+          <button id="closeCompare" class="btn-close">✕</button>
+        </div>
+        <p class="compare-hint">Select up to 2 cards to compare</p>
+        <div id="compareSlots" class="compare-slots">
+          <div class="compare-slot empty" data-slot="0">
+            <span>Select a card</span>
+          </div>
+          <div class="compare-vs">VS</div>
+          <div class="compare-slot empty" data-slot="1">
+            <span>Select a card</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <main class="main">
+      <div class="container">
+        <div id="status" class="status"></div>
+        
+        <section id="leaders3pSection" class="section">
+          <div id="leaders3pTierList"></div>
+        </section>
+        
+        <section id="leaders4pSection" class="section hidden">
+          <div id="leaders4pTierList"></div>
+        </section>
+        
+        <section id="loreSection" class="section hidden">
+          <div id="loreTierList"></div>
+        </section>
+        
+        <section id="basecourtSection" class="section hidden">
+          <div id="basecourtTierList"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="cardModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <button class="modal-close">✕</button>
+        <div class="modal-body">
+          <div class="modal-image">
+            <img id="modalImg" src="" alt="" />
+          </div>
+          <div class="modal-info">
+            <h2 id="modalName" class="modal-name"></h2>
+            <div id="modalText" class="modal-text"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Import modal -->
+    <div id="importModal" class="modal hidden">
+      <div class="modal-backdrop" id="importModalBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Import Tier List</h3>
+          <button id="importModalClose">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Paste your tier list data below:</p>
+          <textarea id="importText" placeholder="Paste tier list data here..."></textarea>
+          <p>Or enter a URL to import from:</p>
+          <input type="text" id="importUrl" placeholder="https://example.com/tierlist" />
+          <div class="modal-actions">
+            <button id="importCancelBtn">Cancel</button>
+            <button id="importConfirmBtn">Import</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Export modal -->
+    <div id="exportModal" class="modal hidden">
+      <div class="modal-backdrop" id="exportModalBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Export Tier List</h3>
+          <button id="exportModalClose">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Copy the data below to share or save your tier list:</p>
+          <textarea id="exportText" readonly></textarea>
+          <div class="modal-actions">
+            <button id="exportCopyBtn">Copy to Clipboard</button>
+            <button id="exportCloseBtn">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Share modal -->
+    <div id="shareModal" class="modal hidden">
+      <div class="modal-backdrop" id="shareModalBackdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Share Tier List</h3>
+          <button id="shareModalClose">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Select sections to include in the shared tier list:</p>
+          <div id="shareSections"></div>
+          <div class="modal-actions">
+            <button id="shareCancelBtn">Cancel</button>
+            <button id="shareConfirmBtn">Share</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="container">
+        <p><a href="./index">Home</a> · <a href="./custom-cards">Custom Cards</a></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./assets/tierlist-app.js"></script>
+  </body>
+</html>
