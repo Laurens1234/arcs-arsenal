@@ -74,9 +74,6 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchMoved = false;
 
-// Mouse drag preview
-let dragPreviewElement = null;
-
 // ========== Utilities ==========
 function setStatus(msg, { isError = false } = {}) {
   el.status.textContent = msg;
@@ -458,28 +455,16 @@ function createCardElement(entry, type) {
     e.dataTransfer.setData("application/x-type", type);
     // Remove opacity from original card immediately
     cardEl.style.opacity = "0";
-    
-    // Create drag preview first
+
+    // Create drag preview
     dragPreviewElement = cardEl.cloneNode(true);
     dragPreviewElement.className = "personal-tier-card drag-preview";
     dragPreviewElement.style.position = "fixed";
     dragPreviewElement.style.pointerEvents = "none";
     dragPreviewElement.style.zIndex = "1000";
-    dragPreviewElement.style.opacity = "0.5";
+    dragPreviewElement.style.opacity = "0.7";
     dragPreviewElement.style.transform = "scale(0.95)";
     document.body.appendChild(dragPreviewElement);
-    
-    // Calculate initial insertion point and position preview immediately
-    const container = cardEl.closest('.personal-tier-cards');
-    if (container) {
-      // Position preview at the dragged card's original position
-      const draggedCardRect = cardEl.getBoundingClientRect();
-      dragPreviewElement.style.left = `${draggedCardRect.left}px`;
-      dragPreviewElement.style.top = `${draggedCardRect.top}px`;
-      dragPreviewElement.style.display = "block";
-      
-      // Don't set currentDragInsertion initially - let the first dragover determine it
-    }
   });
   cardEl.addEventListener("dragend", () => {
     // Restore opacity to original card
@@ -493,7 +478,6 @@ function createCardElement(entry, type) {
     document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
       card.classList.remove('shifted-right', 'shifted-left');
     });
-    currentDragInsertion = null;
   });
   
   // Touch drag support for mobile devices
@@ -667,267 +651,559 @@ function createCardElement(entry, type) {
 // ========== Proximity-based Drag & Drop ==========
 
 // Track current drag state
-let currentDragInsertion = null;
+// Global dragover handler - track mouse position and show live preview
+let dragMouseX = 0;
+let dragMouseY = 0;
+let dragPreviewElement = null;
 
-function findClosestInsertionPoint(mouseX, mouseY) {
-  if (!editMode) return null;
+document.addEventListener("dragover", (e) => {
+  if (!editMode) return;
 
-  // Use grid-based detection instead of proximity
-  // Check all tier containers
-  const tierContainers = document.querySelectorAll('.personal-tier-cards');
-  for (const container of tierContainers) {
-    const containerRect = container.getBoundingClientRect();
+  dragMouseX = e.clientX;
+  dragMouseY = e.clientY;
 
-    // Check if mouse is within this container's bounds (with some padding)
-    if (mouseX >= containerRect.left - 50 && mouseX <= containerRect.right + 50 &&
-        mouseY >= containerRect.top - 20 && mouseY <= containerRect.bottom + 20) {
-
-      const cards = Array.from(container.querySelectorAll('.personal-tier-card'));
-      const type = container.dataset.type;
-      const tier = container.dataset.tier;
-
-      // Create a grid of insertion points
-      const insertionPoints = [];
-
-      if (cards.length === 0) {
-        // Empty tier - single insertion point
-        insertionPoints.push({
-          x: containerRect.left + 6,
-          y: containerRect.top + 6,
-          insertBefore: null,
-          cardsAfterIndex: 0
-        });
-      } else {
-        // Create insertion points before, between, and after cards
-        for (let i = 0; i <= cards.length; i++) {
-          let insertX, insertY, insertBefore;
-
-          if (i === 0) {
-            // Before first card
-            const firstCardRect = cards[0].getBoundingClientRect();
-            insertX = firstCardRect.left - 60;
-            insertY = firstCardRect.top;
-            const cardName = cards[0].dataset.name;
-            const entry = allCards.find(c => c.name === cardName);
-            insertBefore = entry ? entry.name : null;
-          } else if (i === cards.length) {
-            // After last card
-            const lastCardRect = cards[cards.length - 1].getBoundingClientRect();
-            insertX = lastCardRect.right + 60;
-            insertY = lastCardRect.top;
-            insertBefore = null;
-          } else {
-            // Between cards i-1 and i
-            const prevCardRect = cards[i-1].getBoundingClientRect();
-            const nextCardRect = cards[i].getBoundingClientRect();
-            insertX = (prevCardRect.right + nextCardRect.left) / 2;
-            insertY = prevCardRect.top;
-            const cardName = cards[i].dataset.name;
-            const entry = allCards.find(c => c.name === cardName);
-            insertBefore = entry ? entry.name : null;
-          }
-
-          insertionPoints.push({
-            x: insertX,
-            y: insertY,
-            insertBefore,
-            cardsAfterIndex: i
-          });
-        }
-      }
-
-      // Group insertion points by row (Y coordinate) to prevent cross-row jumping
-      const pointsByRow = new Map();
-      for (const point of insertionPoints) {
-        const rowY = Math.round(point.y); // Round to handle minor positioning differences
-        if (!pointsByRow.has(rowY)) {
-          pointsByRow.set(rowY, []);
-        }
-        pointsByRow.get(rowY).push(point);
-      }
-
-      // Find which row the mouse is in
-      let closestRowY = null;
-      let minRowDistance = Infinity;
-      for (const rowY of pointsByRow.keys()) {
-        const rowDistance = Math.abs(mouseY - rowY);
-        if (rowDistance < minRowDistance) {
-          minRowDistance = rowDistance;
-          closestRowY = rowY;
-        }
-      }
-
-      // Only consider insertion points in the closest row
-      const rowPoints = pointsByRow.get(closestRowY) || insertionPoints;
-
-      // Find the closest insertion point horizontally within the row
-      // Prefer "between" insertion points when they are reasonably close
-      let closestPoint = null;
-      let closestDistance = Infinity;
-      let closestBetweenPoint = null;
-      let closestBetweenDistance = Infinity;
-
-      for (const point of rowPoints) {
-        const distance = Math.abs(mouseX - point.x);
-        
-        // Check if this is a "between" insertion point (has insertBefore set to a card name)
-        if (point.insertBefore !== null && point.insertBefore !== undefined && point.insertBefore !== '') {
-          if (distance < closestBetweenDistance) {
-            closestBetweenDistance = distance;
-            closestBetweenPoint = point;
-          }
-        } else {
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestPoint = point;
-          }
-        }
-      }
-
-      // Prefer between points if they are within 100px (roughly the width of a card + gap)
-      if (closestBetweenPoint && closestBetweenDistance < 100) {
-        closestPoint = closestBetweenPoint;
-      } else if (!closestPoint && closestBetweenPoint) {
-        closestPoint = closestBetweenPoint;
-      }
-
-      if (closestPoint) {
-        return {
-          x: closestPoint.x,
-          y: closestPoint.y,
-          container,
-          insertBefore: closestPoint.insertBefore,
-          type,
-          tier,
-          cardsAfterIndex: closestPoint.cardsAfterIndex
-        };
-      }
+  // Create or update drag preview
+  if (!dragPreviewElement) {
+    const draggedCard = document.querySelector('.personal-tier-card[style*="opacity: 0"]');
+    if (draggedCard) {
+      dragPreviewElement = draggedCard.cloneNode(true);
+      dragPreviewElement.className = "personal-tier-card drag-preview";
+      dragPreviewElement.style.position = "fixed";
+      dragPreviewElement.style.pointerEvents = "none";
+      dragPreviewElement.style.zIndex = "1000";
+      dragPreviewElement.style.opacity = "0.7";
+      dragPreviewElement.style.transform = "scale(0.95)";
+      document.body.appendChild(dragPreviewElement);
     }
   }
 
-  // Fallback: find the closest container and use its first insertion point
-  let closestContainer = null;
-  let minDistance = Infinity;
+  // Update preview position and show card rearrangement
+  updateDragPreview();
 
-  for (const container of tierContainers) {
-    const containerRect = container.getBoundingClientRect();
-    const centerX = (containerRect.left + containerRect.right) / 2;
-    const centerY = (containerRect.top + containerRect.bottom) / 2;
-    const distance = Math.sqrt((mouseX - centerX) ** 2 + (mouseY - centerY) ** 2);
+  e.preventDefault();
+});
 
-    if (distance < minDistance) {
-      minDistance = distance;
-      closestContainer = container;
-    }
-  }
+function updateDragPreview() {
+  if (!dragPreviewElement) return;
 
-  if (closestContainer) {
-    const cards = Array.from(closestContainer.querySelectorAll('.personal-tier-card'));
-    const containerRect = closestContainer.getBoundingClientRect();
+  // Find the dragged card
+  const draggedCard = document.querySelector('.personal-tier-card[style*="opacity: 0"]');
+  if (!draggedCard) return;
 
-    if (cards.length === 0) {
-      return {
-        x: containerRect.left + 6,
-        y: containerRect.top + 6,
-        container: closestContainer,
-        insertBefore: null,
-        type: closestContainer.dataset.type,
-        tier: closestContainer.dataset.tier,
-        cardsAfterIndex: 0
-      };
-    } else {
-      // Use the first insertion point (before first card)
-      const firstCardRect = cards[0].getBoundingClientRect();
-      const cardName = cards[0].dataset.name;
-      const entry = allCards.find(c => c.name === cardName);
-      return {
-        x: firstCardRect.left - 60,
-        y: firstCardRect.top,
-        container: closestContainer,
-        insertBefore: entry ? entry.name : null,
-        type: closestContainer.dataset.type,
-        tier: closestContainer.dataset.tier,
-        cardsAfterIndex: 0
-      };
-    }
-  }
-
-  return null; // Should never happen
-}
-
-function updateDragPreview(insertion) {
-  if (!insertion || !dragPreviewElement) return;
-
-  // Position preview
-  dragPreviewElement.style.left = `${insertion.x - 60}px`; // Center the 120px card on the insertion point
-  dragPreviewElement.style.top = `${insertion.y}px`;
-  dragPreviewElement.style.display = "block";
-
-  // Clear all shifting from all containers first
+  // Clear previous shifting
   document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
     card.classList.remove('shifted-right', 'shifted-left');
   });
 
-  // Update shifting for the current insertion point
-  const container = insertion.container;
-  const cards = Array.from(container.querySelectorAll('.personal-tier-card'));
-  
-  // Only shift cards in the same row as the insertion point
-  const insertionRowY = Math.round(insertion.y);
-  for (let i = insertion.cardsAfterIndex; i < cards.length; i++) {
-    const cardRect = cards[i].getBoundingClientRect();
-    const cardRowY = Math.round(cardRect.top);
-    if (cardRowY === insertionRowY) {
-      cards[i].classList.add('shifted-right');
+  // Calculate where the card would be inserted based on current mouse position
+  let previewPosition = null;
+
+  // Check all tier containers to find target position
+  const allTierContainers = document.querySelectorAll('.personal-tier-cards');
+  for (const container of allTierContainers) {
+    const containerRect = container.getBoundingClientRect();
+
+    // Check if mouse is within this container's bounds
+    if (dragMouseX >= containerRect.left && dragMouseX <= containerRect.right &&
+        dragMouseY >= containerRect.top && dragMouseY <= containerRect.bottom) {
+
+      const cardsInTargetTier = Array.from(container.querySelectorAll('.personal-tier-card'));
+      let insertIndex = -1;
+
+      // Check each card to see if mouse is over it (including the dragged card's original position)
+      for (let i = 0; i < cardsInTargetTier.length; i++) {
+        const card = cardsInTargetTier[i];
+        const cardRect = card.getBoundingClientRect();
+
+        // Check if mouse is within this card's bounds
+        if (dragMouseX >= cardRect.left && dragMouseX <= cardRect.right &&
+            dragMouseY >= cardRect.top && dragMouseY <= cardRect.bottom) {
+
+          // Mouse is over this card - determine left or right half
+          const cardCenterX = cardRect.left + cardRect.width / 2;
+          if (dragMouseX < cardCenterX) {
+            // Left half - insert before this card
+            insertIndex = i;
+          } else {
+            // Right half - normally insert after this card, but if this is
+            // the dragged card's original position, move one position further left
+            if (card === draggedCard) {
+              insertIndex = Math.max(i, 0);
+            } else {
+              insertIndex = i + 1;
+            }
+          }
+          break;
+        }
+      }
+
+      // If not over any visible card, check if mouse is over the dragged card's original position
+      // or the left side of the adjacent card to the right
+      if (insertIndex === -1) {
+        const draggedCardIndex = cardsInTargetTier.indexOf(draggedCard);
+        if (draggedCardIndex !== -1) {
+          let originalGapLeft, originalGapRight, originalGapTop, originalGapBottom;
+
+          if (draggedCardIndex === 0) {
+            // Original position was at the beginning
+            if (cardsInTargetTier.length > 1) {
+              const firstCardRect = cardsInTargetTier[1].getBoundingClientRect(); // Next card is now at index 1
+              originalGapLeft = containerRect.left;
+              originalGapRight = firstCardRect.left;
+              originalGapTop = firstCardRect.top;
+              originalGapBottom = firstCardRect.bottom;
+            } else {
+              // Only card in tier
+              originalGapLeft = containerRect.left;
+              originalGapRight = containerRect.right;
+              originalGapTop = containerRect.top;
+              originalGapBottom = containerRect.bottom;
+            }
+          } else if (draggedCardIndex === cardsInTargetTier.length - 1) {
+            // Original position was at the end
+            const lastVisibleCardRect = cardsInTargetTier[draggedCardIndex - 1].getBoundingClientRect();
+            originalGapLeft = lastVisibleCardRect.right;
+            originalGapRight = containerRect.right;
+            originalGapTop = lastVisibleCardRect.top;
+            originalGapBottom = lastVisibleCardRect.bottom;
+          } else {
+            // Original position was in the middle
+            const prevCardRect = cardsInTargetTier[draggedCardIndex - 1].getBoundingClientRect();
+            const nextCardRect = cardsInTargetTier[draggedCardIndex + 1].getBoundingClientRect();
+            originalGapLeft = prevCardRect.right;
+            originalGapRight = nextCardRect.left;
+            originalGapTop = Math.min(prevCardRect.top, nextCardRect.top);
+            originalGapBottom = Math.max(prevCardRect.bottom, nextCardRect.bottom);
+          }
+
+          // Check if mouse is in the original gap
+          if (dragMouseX >= originalGapLeft && dragMouseX <= originalGapRight &&
+              dragMouseY >= originalGapTop && dragMouseY <= originalGapBottom) {
+            // Check if mouse is in left or right half of the gap
+            const gapCenterX = originalGapLeft + (originalGapRight - originalGapLeft) / 2;
+            if (dragMouseX < gapCenterX || draggedCardIndex === 0) {
+              // Left half or beginning position - insert at original position
+              insertIndex = draggedCardIndex ;
+            } else {
+              // Right half - insert one position to the left
+              insertIndex = draggedCardIndex -1;
+            }
+          }
+        } else {
+          // Check if mouse is over the left side of the card immediately to the right of the original position
+          // Only apply this special case if the dragged card was not originally at the end of the tier
+          const draggedCardIndex = cardsInTargetTier.indexOf(draggedCard);
+          if (draggedCardIndex !== -1 && draggedCardIndex + 1 < cardsInTargetTier.length && draggedCardIndex < cardsInTargetTier.length - 1) {
+            const nextCard = cardsInTargetTier[draggedCardIndex + 1];
+            const nextCardRect = nextCard.getBoundingClientRect();
+            if (dragMouseX >= nextCardRect.left && dragMouseX <= nextCardRect.left + nextCardRect.width / 2 &&
+                dragMouseY >= nextCardRect.top && dragMouseY <= nextCardRect.bottom) {
+              // Mouse is over the left side of the next card - insert one position to the left of original
+              insertIndex = draggedCardIndex - 1;
+            }
+          }
+        }
+      }
+
+      // If not over any card, check gaps between cards
+      if (insertIndex === -1) {
+        for (let i = 0; i <= cardsInTargetTier.length; i++) {
+          let gapLeft, gapRight, gapTop, gapBottom;
+
+          if (i === 0) {
+            // Gap before first card
+            if (cardsInTargetTier.length > 0) {
+              const firstCardRect = cardsInTargetTier[0].getBoundingClientRect();
+              gapLeft = containerRect.left;
+              gapRight = firstCardRect.left;
+              gapTop = firstCardRect.top;
+              gapBottom = firstCardRect.bottom;
+              insertIndex = 0;
+            } else {
+              // Empty tier
+              insertIndex = 0;
+            }
+          } else if (i === cardsInTargetTier.length) {
+            // Gap after last card
+            const lastCardRect = cardsInTargetTier[cardsInTargetTier.length - 1].getBoundingClientRect();
+            gapLeft = lastCardRect.right;
+            gapRight = containerRect.right;
+            gapTop = lastCardRect.top;
+            gapBottom = lastCardRect.bottom;
+            insertIndex = cardsInTargetTier.length;
+          } else {
+            // Gap between cards
+            const prevCardRect = cardsInTargetTier[i - 1].getBoundingClientRect();
+            const nextCardRect = cardsInTargetTier[i].getBoundingClientRect();
+            gapLeft = prevCardRect.right;
+            gapRight = nextCardRect.left;
+            gapTop = Math.min(prevCardRect.top, nextCardRect.top);
+            gapBottom = Math.max(prevCardRect.bottom, nextCardRect.bottom);
+            insertIndex = i;
+          }
+
+          // Check if mouse is in this gap
+          if (dragMouseX >= gapLeft && dragMouseX <= gapRight &&
+              dragMouseY >= gapTop && dragMouseY <= gapBottom) {
+            break;
+          }
+        }
+      }
+
+      // Calculate preview position based on insert index
+      if (insertIndex !== -1) {
+        // Find the actual position of the dragged card in the current layout
+        let draggedCardIndex = -1;
+        for (let i = 0; i < cardsInTargetTier.length; i++) {
+          if (cardsInTargetTier[i] === draggedCard) {
+            draggedCardIndex = i;
+            break;
+          }
+        }
+
+        // If the computed insertIndex would place the card after the card
+        // that is immediately after the original card, and the original
+        // card was the lower index (draggedCardIndex === insertIndex - 1),
+        // move the insertion one position left so it lands at the original
+        // card's index instead. This handles the case when pointer moves
+        // from the right-half of the original card to the left-half of
+        // the next card (user requested behavior).
+        if (draggedCardIndex !== -1 && insertIndex !== -1 && draggedCardIndex === insertIndex - 1) {
+          const oldIndex = insertIndex;
+          insertIndex = Math.max(0, insertIndex - 1);
+          console.log(`[drag-debug] adjusted insertIndex ${oldIndex} -> ${insertIndex} because original card was lower index`);
+        }
+
+        if (draggedCardIndex !== -1 && draggedCardIndex === insertIndex) {
+          // Dragged card is being placed back in its original position
+          if (draggedCardIndex === cardsInTargetTier.length - 1) {
+            // Card was at the end - position after the last visible card
+            const lastVisibleCardRect = cardsInTargetTier[draggedCardIndex - 1].getBoundingClientRect();
+            previewPosition = {
+              left: lastVisibleCardRect.right + 2,
+              top: lastVisibleCardRect.top
+            };
+          } else {
+            // Card was not at the end - use its original position
+            const draggedCardRect = draggedCard.getBoundingClientRect();
+            previewPosition = {
+              left: draggedCardRect.left,
+              top: draggedCardRect.top
+            };
+          }
+        } else if (cardsInTargetTier.length === 0) {
+          // Empty tier
+          previewPosition = {
+            left: containerRect.left + 6,
+            top: containerRect.top + 6
+          };
+        } else if (insertIndex === 0) {
+          // Insert at beginning
+          previewPosition = {
+            left: containerRect.left + 6,
+            top: containerRect.top + 6
+          };
+        } else if (insertIndex >= cardsInTargetTier.length) {
+          // Insert at end
+          const lastCardRect = cardsInTargetTier[cardsInTargetTier.length - 1].getBoundingClientRect();
+          previewPosition = {
+            left: lastCardRect.right + 2,
+            top: lastCardRect.top
+          };
+        } else {
+          // Insert between cards
+          const prevCardRect = cardsInTargetTier[insertIndex - 1].getBoundingClientRect();
+          const nextCardRect = cardsInTargetTier[insertIndex].getBoundingClientRect();
+          previewPosition = {
+            left: prevCardRect.right + 2,
+            top: prevCardRect.top
+          };
+        }
+
+        // Shift cards based on where the dragged card would be inserted
+        // Debug: report where the dragged card would be placed, which card is nearest,
+        // whether it's on the left/right side of that card, and if it's over the original card
+        try {
+          const cardName = draggedCard && draggedCard.dataset && draggedCard.dataset.name ? draggedCard.dataset.name : '<unknown>';
+          const targetTier = container && container.dataset ? container.dataset.tier : '<unknown>';
+          let overCardName = null;
+          let overSide = null;
+          if (cardsInTargetTier.length > 0) {
+            let overEl = null;
+            if (insertIndex === 0) {
+              overEl = cardsInTargetTier[0];
+            } else if (insertIndex >= cardsInTargetTier.length) {
+              overEl = cardsInTargetTier[cardsInTargetTier.length - 1];
+            } else {
+              overEl = cardsInTargetTier[insertIndex];
+            }
+            if (overEl) {
+              overCardName = overEl.dataset ? overEl.dataset.name : null;
+              const overRect = overEl.getBoundingClientRect();
+              const overCenter = overRect.left + overRect.width / 2;
+              overSide = (dragMouseX < overCenter) ? 'left' : 'right';
+            }
+          }
+
+          let onOriginal = false;
+          if (draggedCard) {
+            const origRect = draggedCard.getBoundingClientRect();
+            onOriginal = (dragMouseX >= origRect.left && dragMouseX <= origRect.right && dragMouseY >= origRect.top && dragMouseY <= origRect.bottom);
+          }
+
+          console.log(`[drag-debug] card="${cardName}" targetTier="${targetTier}" insertIndex=${insertIndex} overCard="${overCardName}" overSide=${overSide} onOriginal=${onOriginal}`);
+        } catch (err) {
+          console.log('[drag-debug] failed to read drag state', err);
+        }
+
+        for (let i = 0; i < cardsInTargetTier.length; i++) {
+          const card = cardsInTargetTier[i];
+          if (card === draggedCard) continue;
+
+          if (draggedCardIndex !== -1 && draggedCardIndex < insertIndex) {
+            // Dragged card is moving right, so cards between old and new position shift left
+            if (i > draggedCardIndex && i < insertIndex) {
+              card.classList.add('shifted-left');
+            }
+          } else if (draggedCardIndex !== -1 && draggedCardIndex > insertIndex) {
+            // Dragged card is moving left, so cards between new and old position shift right
+            if (i >= insertIndex && i < draggedCardIndex) {
+              card.classList.add('shifted-right');
+            }
+          } else if (draggedCardIndex === -1) {
+            // Dragged card is moving to this tier from another tier
+            if (i >= insertIndex) {
+              card.classList.add('shifted-right');
+            }
+          }
+        }
+      }
+
+      break; // Found the target tier, stop checking others
     }
   }
 
-  currentDragInsertion = insertion;
-}
-
-// Global dragover handler
-let lastDragUpdate = 0;
-document.addEventListener("dragover", (e) => {
-  if (!editMode || !dragPreviewElement) return;
-
-  const now = Date.now();
-  if (now - lastDragUpdate < 16) return; // Throttle to ~60fps
-  lastDragUpdate = now;
-
-  const insertion = findClosestInsertionPoint(e.clientX, e.clientY);
-  if (insertion) {
-    e.preventDefault();
-    updateDragPreview(insertion);
+  // Position preview at the calculated insertion spot
+  if (previewPosition) {
+    dragPreviewElement.style.left = `${previewPosition.left}px`;
+    dragPreviewElement.style.top = `${previewPosition.top}px`;
+    dragPreviewElement.style.display = "block";
   } else {
-    // No valid insertion point found - clear all shifting
     dragPreviewElement.style.display = "none";
-    document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
-      card.classList.remove('shifted-right', 'shifted-left');
-    });
-    currentDragInsertion = null;
   }
-});
+}
 
 // Global drop handler
 document.addEventListener("drop", (e) => {
-  if (!editMode || !currentDragInsertion) return;
+  if (!editMode) return;
 
   e.preventDefault();
   const cardName = e.dataTransfer.getData("text/plain");
   const srcType = e.dataTransfer.getData("application/x-type");
 
-  if (srcType !== currentDragInsertion.type) return; // don't mix leaders/lore
+  // Check if dropping directly on the original card (which is invisible)
+  const elementAtPoint = document.elementFromPoint(e.clientX, e.clientY);
+  const originalCard = document.querySelector(`.personal-tier-card[data-name="${cardName}"]`);
+  if (elementAtPoint === originalCard) {
+    // Dropped directly on the original invisible card - don't move
+    // Clean up visual effects
+    if (dragPreviewElement && dragPreviewElement.parentNode) {
+      dragPreviewElement.parentNode.removeChild(dragPreviewElement);
+    }
+    dragPreviewElement = null;
+    document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
+      card.classList.remove('shifted-right', 'shifted-left');
+    });
+    return;
+  }
 
   // Clean up visual effects first
-  dragPreviewElement.style.display = "none";
+  if (dragPreviewElement && dragPreviewElement.parentNode) {
+    dragPreviewElement.parentNode.removeChild(dragPreviewElement);
+  }
+  dragPreviewElement = null;
   document.querySelectorAll('.personal-tier-card.shifted-right, .personal-tier-card.shifted-left').forEach(card => {
     card.classList.remove('shifted-right', 'shifted-left');
   });
 
-  // Then move the card
-  moveCard(cardName, currentDragInsertion.tier, currentDragInsertion.type, currentDragInsertion.insertBefore);
+  // Find the tier container that contains the dragged card
+  const draggedCard = document.querySelector(`.personal-tier-card[data-name="${cardName}"]`);
+  if (!draggedCard) return;
 
-  currentDragInsertion = null;
+  const tierContainer = draggedCard.closest('.personal-tier-cards');
+  if (!tierContainer) return;
+
+  // Get all cards in this tier
+  const cardsInTier = Array.from(tierContainer.querySelectorAll('.personal-tier-card'));
+  const tierRect = tierContainer.getBoundingClientRect();
+
+  // Find insertion position based on mouse position (center of dragged card)
+  let insertBefore = null;
+  let targetTier = tierContainer.dataset.tier;
+  let foundPosition = false;
+
+  // Check all tier containers to see if mouse is over a different tier
+  const allTierContainers = document.querySelectorAll('.personal-tier-cards');
+  for (const container of allTierContainers) {
+    const containerRect = container.getBoundingClientRect();
+
+    // Check if mouse is within this container's bounds
+    if (dragMouseX >= containerRect.left && dragMouseX <= containerRect.right &&
+        dragMouseY >= containerRect.top && dragMouseY <= containerRect.bottom) {
+
+      targetTier = container.dataset.tier;
+      const cardsInTargetTier = Array.from(container.querySelectorAll('.personal-tier-card'));
+
+      // If dropping in the same tier as the dragged card, check original position first
+      const draggedCardTier = draggedCard.dataset.tier;
+      if (targetTier === draggedCardTier) {
+        const draggedCardIndex = cardsInTargetTier.indexOf(draggedCard);
+        if (draggedCardIndex !== -1) {
+          let originalGapLeft, originalGapRight, originalGapTop, originalGapBottom;
+
+          if (draggedCardIndex === 0) {
+            // Original position was at the beginning
+            if (cardsInTargetTier.length > 1) {
+              const firstCardRect = cardsInTargetTier[1].getBoundingClientRect();
+              originalGapLeft = containerRect.left;
+              originalGapRight = firstCardRect.left;
+              originalGapTop = firstCardRect.top;
+              originalGapBottom = firstCardRect.bottom;
+            } else {
+              // Only card in tier
+              originalGapLeft = containerRect.left;
+              originalGapRight = containerRect.right;
+              originalGapTop = containerRect.top;
+              originalGapBottom = containerRect.bottom;
+            }
+          } else if (draggedCardIndex === cardsInTargetTier.length - 1) {
+            // Original position was at the end
+            const lastVisibleCardRect = cardsInTargetTier[draggedCardIndex - 1].getBoundingClientRect();
+            originalGapLeft = lastVisibleCardRect.right;
+            originalGapRight = containerRect.right;
+            originalGapTop = lastVisibleCardRect.top;
+            originalGapBottom = lastVisibleCardRect.bottom;
+          } else {
+            // Original position was in the middle
+            const prevCardRect = cardsInTargetTier[draggedCardIndex - 1].getBoundingClientRect();
+            const nextCardRect = cardsInTargetTier[draggedCardIndex + 1].getBoundingClientRect();
+            originalGapLeft = prevCardRect.right;
+            originalGapRight = nextCardRect.left;
+            originalGapTop = Math.min(prevCardRect.top, nextCardRect.top);
+            originalGapBottom = Math.max(prevCardRect.bottom, nextCardRect.bottom);
+          }
+
+          // Check if mouse is in the original gap
+          if (dragMouseX >= originalGapLeft && dragMouseX <= originalGapRight &&
+              dragMouseY >= originalGapTop && dragMouseY <= originalGapBottom) {
+            document.title = "My Tier List - ingap";
+            // Check if mouse is in left or right half of the gap
+            const gapCenterX = originalGapLeft + (originalGapRight - originalGapLeft) / 2;
+            if (dragMouseX < gapCenterX || draggedCardIndex === 0) {
+              // Left half or beginning position - insert at original position
+              insertBefore = draggedCard.dataset.name;
+              document.title = "My Tier List - lefthalf";
+            } else {
+              // Right half - insert one position to the left
+              const leftIndex = draggedCardIndex - 1;
+              insertBefore = leftIndex >= 0 ? cardsInTargetTier[leftIndex].dataset.name : null;
+              document.title = "My Tier List - righthalf";
+            }
+            foundPosition = true;
+          }
+        }
+      }
+
+      // Check each card in the target tier to see if mouse is over it
+      if (!foundPosition) {
+        for (let i = 0; i < cardsInTargetTier.length; i++) {
+          const card = cardsInTargetTier[i];
+          if (card === draggedCard) continue; // Skip the dragged card itself
+
+          const cardRect = card.getBoundingClientRect();
+
+        // Check if mouse is within this card's bounds
+        if (dragMouseX >= cardRect.left && dragMouseX <= cardRect.right &&
+            dragMouseY >= cardRect.top && dragMouseY <= cardRect.bottom) {
+
+          // Mouse is over this card - determine left or right half
+          const cardCenterX = cardRect.left + cardRect.width / 2;
+          if (dragMouseX < cardCenterX) {
+            // Left half - insert before this card
+            insertBefore = card.dataset.name;
+          } else {
+            // Right half - insert after this card
+            if (i < cardsInTargetTier.length - 1) {
+              insertBefore = cardsInTargetTier[i + 1].dataset.name;
+            } else {
+              insertBefore = null; // Insert at end
+            }
+          }
+          foundPosition = true;
+          break;
+        }
+      }
+    }
+
+      // If not over any card, check gaps between cards in target tier
+      if (!foundPosition) {
+        for (let i = 0; i <= cardsInTargetTier.length; i++) {
+          let gapLeft, gapRight, gapTop, gapBottom;
+
+          if (i === 0) {
+            // Gap before first card
+            if (cardsInTargetTier.length > 0) {
+              const firstCardRect = cardsInTargetTier[0].getBoundingClientRect();
+              gapLeft = containerRect.left;
+              gapRight = firstCardRect.left;
+              gapTop = firstCardRect.top;
+              gapBottom = firstCardRect.bottom;
+              insertBefore = cardsInTargetTier[0].dataset.name;
+            } else {
+              // Empty tier
+              gapLeft = containerRect.left;
+              gapRight = containerRect.right;
+              gapTop = containerRect.top;
+              gapBottom = containerRect.bottom;
+              insertBefore = null;
+            }
+          } else if (i === cardsInTargetTier.length) {
+            // Gap after last card
+            const lastCardRect = cardsInTargetTier[cardsInTargetTier.length - 1].getBoundingClientRect();
+            gapLeft = lastCardRect.right;
+            gapRight = containerRect.right;
+            gapTop = lastCardRect.top;
+            gapBottom = lastCardRect.bottom;
+            insertBefore = null; // Insert at end
+          } else {
+            // Gap between cards
+            const prevCardRect = cardsInTargetTier[i - 1].getBoundingClientRect();
+            const nextCardRect = cardsInTargetTier[i].getBoundingClientRect();
+            gapLeft = prevCardRect.right;
+            gapRight = nextCardRect.left;
+            gapTop = Math.min(prevCardRect.top, nextCardRect.top);
+            gapBottom = Math.max(prevCardRect.bottom, nextCardRect.bottom);
+            insertBefore = cardsInTargetTier[i].dataset.name;
+          }
+
+          // Check if mouse is in this gap
+          if (dragMouseX >= gapLeft && dragMouseX <= gapRight &&
+              dragMouseY >= gapTop && dragMouseY <= gapBottom) {
+            foundPosition = true;
+            break;
+          }
+        }
+      }
+
+      break; // Found the target tier, stop checking others
+    }
+  }
+
+  // If we found a valid position, move the card
+  if (foundPosition) {
+    moveCard(cardName, targetTier, srcType, insertBefore);
+  }
+  // If no valid position found, card stays in its current position
 });
 
 function moveCard(name, newTier, type, insertBefore = null) {

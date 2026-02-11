@@ -118,7 +118,7 @@
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 0;
   padding: 6px;
   background: rgba(255, 255, 255, 0.02);
   align-items: center;
@@ -126,10 +126,11 @@
 }
 
 .edit-mode .personal-tier-cards {
-  gap: 2px;
+  gap: 0;
 }
 
 .personal-tier-card {
+  --card-width: 120px;
   position: relative;
   width: 120px;
   border-radius: var(--radius-sm);
@@ -184,12 +185,12 @@
 }
 
 .personal-tier-card.shifted-right {
-  transform: translateX(122px); /* 120px card width + 2px gap in edit mode */
+  transform: translateX(calc(var(--card-width) + 0px));
   transition: none !important;
 }
 
 .personal-tier-card.shifted-left {
-  transform: translateX(-122px); /* Move left to fill space of hidden card */
+  transform: translateX(calc(var(--card-width) * -1));
   transition: none !important;
 }
 
@@ -223,14 +224,14 @@
 }
 
 .card-drop-zone {
-  width: 12px;
+  width: 0;
   height: 120px;
   background: transparent;
   border: 2px dashed transparent;
   border-radius: var(--radius-sm);
   transition: all 0.2s ease;
   flex-shrink: 0;
-  margin: 0 1px;
+  margin: 0;
 }
 
 .card-drop-zone.drag-over {
@@ -267,21 +268,23 @@
   }
 
   .personal-tier-card {
+    --card-width: 90px;
     width: 90px;
   }
 
   .personal-tier-cards {
-    gap: 4px;
+    gap: 0;
     padding: 8px;
   }
 
   .edit-mode .personal-tier-cards {
-    gap: 2px;
+    gap: 0;
   }
 }
 
 @media (max-width: 480px) {
   .personal-tier-card {
+    --card-width: 72px;
     width: 72px;
   }
 
