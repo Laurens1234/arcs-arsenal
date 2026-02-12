@@ -57,21 +57,136 @@
   padding: 32px; /* Increased from 24px */
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
-  width: fit-content;
+  width: 100%;
+  max-width: 1200px;
   margin: 0 auto;
+}
+
+.calculator-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 8px;
+  margin-left: auto;
+  margin-right: auto;
+  align-items: start;
+}
+
+.calculator-layout.single-column {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  max-width: 800px;
+}
+
+.dice-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+}
+
+#customProbSection {
+  background: var(--bg-solid);
+  border-radius: var(--radius-sm);
+  border: 2px solid var(--border);
+  padding: 20px;
+}
+
+.add-roll-section {
+  text-align: left;
+  margin-bottom: 0px;
+}
+
+.btn-add {
+  background: #87ceeb;
+  color: white;
+  border: 2px solid #87ceeb;
+  padding: 12px 24px;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.18), 0 0 0 3px rgba(0,0,0,0.04);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn-add:hover {
+  background: #6bb6d6;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.22), 0 0 0 4px rgba(0,0,0,0.05);
+}
+
+.add-roll-section .btn-add:focus {
+  outline: none;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.22), 0 0 0 4px rgba(0,0,0,0.06);
+}
+
+.add-roll-section .btn-add:active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.add-roll-section {
+  display: flex;
+  justify-content: flex-start;
+  width: 200px; /* match .dice-row width so left edges align */
+  margin: 12px 0 0 0;
+}
+
+.dice-sections {
+  display: flex;
+  flex-direction: column;
+}
+
+.dice-sections.centered {
+  align-items: center;
 }
 
 .dice-inputs {
   display: flex;
   flex-direction: column;
   gap: 20px; /* Increased from 12px */
-  margin: 0 auto;
   width: fit-content;
   background: var(--bg-solid);
   border-radius: var(--radius-sm);
   border: 2px solid var(--border);
   padding: 20px;
-  margin-bottom: 4px; /* Add space below dice inputs */
+}
+
+.dice-inputs-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+
+.remove-dice-inputs-btn {
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: var(--error);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-dice-inputs-btn:hover {
+  background: var(--error-hover);
+  transform: scale(1.1);
+}
+
+.remove-dice-inputs-btn:active {
+  transform: scale(0.95);
+}
+
+.dice-inputs.centered {
+  margin: 0 auto;
 }
 
 .dice-row {
@@ -97,6 +212,30 @@
   align-items: center;
   justify-content: center;
   color: white;
+}
+
+.assault-label {
+  background: #83271c; /* Dark red/brown for assault */
+}
+
+.assault-label:hover {
+  background: #6b1f16; /* Darker version for hover */
+}
+
+.skirmish-label {
+  background: #4e7d84; /* Teal/blue-gray for skirmish */
+}
+
+.skirmish-label:hover {
+  background: #3f656c; /* Darker version for hover */
+}
+
+.raid-label {
+  background: #d07430; /* Orange/brown for raid */
+}
+
+.raid-label:hover {
+  background: #b86329; /* Darker version for hover */
 }
 
 .dice-label-btn:hover {
@@ -246,6 +385,7 @@
 .roll-section {
   display: flex;
   justify-content: center;
+  gap: 10px;
   margin-bottom: 20px; /* Increased from 16px */
 }
 
@@ -275,6 +415,24 @@
 .roll-section {
   margin-top: 8px;
   text-align: center;
+}
+
+.simulation-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.simulation-table th,
+.simulation-table td {
+  border: 1px solid var(--border);
+  padding: 8px;
+  text-align: center;
+}
+
+.simulation-table th {
+  background: var(--bg-card);
+  font-weight: 600;
 }
 
 .calc-select,
@@ -448,7 +606,7 @@
 
 .bell-curve-item {
   width: 100%;
-  background: var(--bg-secondary);
+  background: var(--bg-solid);
   padding: 20px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
@@ -486,7 +644,7 @@
 }
 
 .bell-curve-chart::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: var(--bg-solid);
   border-radius: 2px;
 }
 
@@ -539,4 +697,114 @@
 /* Dark mode adjustments */
 [data-theme="dark"] .bell-curve-icon {
   filter: invert(1);
+}
+
+/* Custom Probability Calculator */
+#customProbSection {
+  margin-top: 0px; /* reduced to position higher */
+  width: 100%;
+  max-width: calc(100vw - 40px);
+  padding: 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-sizing: border-box;
+}
+
+.custom-prob-title {
+  margin: 0 0 4px 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+}
+
+.custom-prob-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.custom-prob-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-solid);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.custom-prob-icon {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.custom-prob-name {
+  font-weight: 500;
+  color: var(--text);
+  min-width: 80px;
+}
+
+.custom-prob-input {
+  width: 60px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.custom-prob-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.custom-prob-result {
+  font-weight: 600;
+  color: var(--accent);
+  min-width: 50px;
+  text-align: right;
+}
+
+/* Dark mode adjustments for custom prob */
+[data-theme="dark"] .custom-prob-icon {
+  filter: invert(1);
+}
+
+.custom-prob-combined {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 4px;
+  padding: 15px;
+  background: var(--bg-solid);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.btn-calculate {
+  padding: 8px 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s ease;
+}
+
+.btn-calculate:hover {
+  background: var(--accent-hover);
+}
+
+#combinedResult {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 1.1rem;
 }

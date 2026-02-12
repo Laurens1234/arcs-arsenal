@@ -46,6 +46,7 @@
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
         </button>
+        <button id="advancedToggle" class="advanced-toggle" aria-label="Toggle advanced mode">Advanced Mode</button>
       </div>
     </header>
 
@@ -64,24 +65,57 @@
         <!-- ===== PROBABILITY CALCULATOR ===== -->
         <div class="dice-calculator">
           <h2 class="dice-section-title">Arcs Dice</h2>
-          <div class="dice-inputs">
-            <div class="dice-row">
-              <button class="dice-label-btn" id="assaultLabel">Assault</button>
-              <div class="dice-visual" id="assaultVisual"></div>
-              <button class="dice-clear-btn" id="assaultClear" title="Clear all Assault dice">×</button>
+          <div class="calculator-layout">
+            <div class="dice-sections">
+              <div class="dice-inputs">
+                <div class="dice-row">
+                  <button class="dice-label-btn assault-label">Assault</button>
+                  <div class="dice-visual assault-visual"></div>
+                  <button class="dice-clear-btn assault-clear" title="Clear all Assault dice">×</button>
+                </div>
+                <div class="dice-row">
+                  <button class="dice-label-btn skirmish-label">Skirmish</button>
+                  <div class="dice-visual skirmish-visual"></div>
+                  <button class="dice-clear-btn skirmish-clear" title="Clear all Skirmish dice">×</button>
+                </div>
+                <div class="dice-row">
+                  <button class="dice-label-btn raid-label">Raid</button>
+                  <div class="dice-visual raid-visual"></div>
+                  <button class="dice-clear-btn raid-clear" title="Clear all Raid dice">×</button>
+                </div>
+              </div>
+              <div class="add-roll-section">
+                <button id="addDieRollBtn" class="btn-add">Add Die Roll</button>
+              </div>
             </div>
-            <div class="dice-row">
-              <button class="dice-label-btn" id="skirmishLabel">Skirmish</button>
-              <div class="dice-visual" id="skirmishVisual"></div>
-              <button class="dice-clear-btn" id="skirmishClear" title="Clear all Skirmish dice">×</button>
-            </div>
-            <div class="dice-row">
-              <button class="dice-label-btn" id="raidLabel">Raid</button>
-              <div class="dice-visual" id="raidVisual"></div>
-              <button class="dice-clear-btn" id="raidClear" title="Clear all Raid dice">×</button>
-            </div>
+            <div id="customProbSection"></div>
           </div>
           <div id="result" class="calc-result"></div>
+          <div class="intercept-config" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px;">
+            <label for="interceptMultiplier">Self-hits if Intercepted:</label>
+            <select id="interceptMultiplier" class="header-select">
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+              <option value="11">11</option>
+              <option value="12">12</option>
+              <option value="13">13</option>
+              <option value="14">14</option>
+              <option value="15">15</option>
+            </select>
+            <div class="intercept-options" style="display: flex; flex-direction: column; gap: 5px;">
+              <label style="font-size: 0.9em;"><input type="checkbox" id="mirrorPlating"> Mirror Plating (+1 intercept)</label>
+              <label style="font-size: 0.9em;"><input type="checkbox" id="signalBreaker"> Signal Breaker (ignore 1 rolled intercept)</label>
+            </div>
+          </div>
           <div class="roll-section">
             <button id="rollDiceBtn" class="btn-roll">🎲 Roll Dice</button>
           </div>
@@ -93,7 +127,6 @@
     <footer class="footer">
       <div class="container">
         <p><a href="./tierlist">My Tier List</a> · <a href="./data">Data Arsenal</a> · <a href="./draft">Draft Helper</a> · <a href="./index">Home</a></p>
-        <button id="resetAllBtn" class="btn-sm" style="position: absolute; bottom: 20px; right: 24px; opacity: 0.8; font-size: 0.8rem;" title="Reset All (reloads page)">Reset All</button>
       </div>
     </footer>
 
