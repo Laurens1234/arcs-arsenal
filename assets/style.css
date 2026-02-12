@@ -192,13 +192,14 @@ body {
   background-size: 200% auto;
   color: white;
   border: 1px solid transparent;
-  padding: 8px 16px;
+  padding: 12px 16px;
   border-radius: var(--radius-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   margin-left: 12px;
   animation: shimmer 3s linear infinite;
+  text-align: right;
 }
 
 .advanced-toggle:hover {
@@ -271,6 +272,12 @@ body {
 }
 
 .controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.nav-right {
   display: flex;
   gap: 12px;
   align-items: center;

@@ -1925,7 +1925,7 @@ function initDownload() {
       alert("Failed to capture tier list. Try again.");
     } finally {
       el.downloadBtn.disabled = false;
-      el.downloadBtn.textContent = "\u2b07 Download High Res PNG";
+      el.downloadBtn.textContent = "\u2b07 Download PNG";
     }
   });
 }
@@ -2136,6 +2136,29 @@ function updateMetaTagsForSharedTierList(encoded) {
 }
 
 async function shareTierList() {
+  // Load the default tier list from spreadsheet
+  const rows = await loadTierListSheet();
+  const defaultTierData = parseTierListSheet(rows, allCards);
+
+  // Check if the current tier list matches the default
+  const isDefault = arraysEqual(leaderEntries3P, defaultTierData.leaders3P) &&
+                    arraysEqual(leaderEntries4P, defaultTierData.leaders4P) &&
+                    arraysEqual(loreEntries, defaultTierData.lore) &&
+                    arraysEqual(basecourtEntries, defaultTierData.basecourt);
+
+  if (isDefault) {
+    // Share the default tier list (base URL without parameters)
+    const url = new URL(window.location);
+    url.searchParams.delete('tierlist');
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      alert('Shareable link to default tier list copied to clipboard!');
+    }).catch(() => {
+      alert(`Shareable link: ${url.toString()}`);
+    });
+    return;
+  }
+
+  // Proceed with custom share modal for edited tier lists
   populateShareModal();
   el.shareModal.classList.remove('hidden');
 }
@@ -2182,10 +2205,7 @@ function populateShareModal() {
   });
 }
 
-async function confirmShare() {
-  // Load the default tier list
-  const defaultTierData = await loadDefaultTierList();
-
+function confirmShare() {
   const selectedSections = [];
   
   // Collect selected sections
@@ -2195,16 +2215,15 @@ async function confirmShare() {
     const nameInput = document.getElementById(`name-${sectionId}`);
     const customName = nameInput.value.trim() || nameInput.placeholder;
     
-    let data, defaultData;
+    let data;
     switch (sectionId) {
-      case 'leaders3p': data = leaderEntries3P; defaultData = defaultTierData.leaders3P; break;
-      case 'leaders4p': data = leaderEntries4P; defaultData = defaultTierData.leaders4P; break;
-      case 'lore': data = loreEntries; defaultData = defaultTierData.lore; break;
-      case 'basecourt': data = basecourtEntries; defaultData = defaultTierData.basecourt; break;
+      case 'leaders3p': data = leaderEntries3P; break;
+      case 'leaders4p': data = leaderEntries4P; break;
+      case 'lore': data = loreEntries; break;
+      case 'basecourt': data = basecourtEntries; break;
     }
     
-    // Only include if data exists and differs from default
-    if (data && data.length > 0 && !arraysEqual(data, defaultData)) {
+    if (data && data.length > 0) {
       selectedSections.push({
         id: sectionId,
         name: customName,
@@ -2214,15 +2233,7 @@ async function confirmShare() {
   });
   
   if (selectedSections.length === 0) {
-    // All selected sections are default, share base URL
-    const url = new URL(window.location);
-    url.searchParams.delete('tierlist');
-    navigator.clipboard.writeText(url.toString()).then(() => {
-      alert('Shareable link to default tier list copied to clipboard!');
-    }).catch(() => {
-      alert(`Shareable link: ${url.toString()}`);
-    });
-    el.shareModal.classList.add('hidden');
+    alert('Please select at least one tier list to share.');
     return;
   }
   

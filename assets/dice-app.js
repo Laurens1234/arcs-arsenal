@@ -1063,13 +1063,13 @@ themeToggle.addEventListener('click', () => {
 });
 
 // Advanced mode toggle
-let isAdvancedMode = localStorage.getItem('advancedMode') === 'true';
+let isAdvancedMode = false; // Start with advanced mode off by default
 const advancedToggle = document.getElementById('advancedToggle');
 
 function updateAdvancedMode() {
   advancedToggle.textContent = isAdvancedMode ? 'Advanced Mode: On' : 'Advanced Mode: Off';
   advancedToggle.classList.toggle('active', isAdvancedMode);
-  document.querySelector('.add-roll-section').style.display = isAdvancedMode ? 'block' : 'none';
+  document.getElementById('addDieRollBtn').style.display = isAdvancedMode ? 'block' : 'none';
   document.getElementById('customProbSection').style.display = isAdvancedMode ? 'block' : 'none';
   document.querySelector('.dice-sections').classList.toggle('centered', !isAdvancedMode);
   document.querySelectorAll('.dice-inputs').forEach(el => el.classList.toggle('centered', !isAdvancedMode));

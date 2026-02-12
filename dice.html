@@ -36,7 +36,7 @@
       <div class="container header-inner">
         <div>
           <h1 class="logo"><a href="./index" style="text-decoration:none;color:inherit">Dice Calculator</a></h1>
-          <p class="tagline">Calculate probabilities for Arcs dice rolls</p>
+          <p class="tagline">Calculate probabilities for Arcs dice rolls.</p>
         </div>
         <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
           <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -46,14 +46,17 @@
             <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
           </svg>
         </button>
-        <button id="advancedToggle" class="advanced-toggle" aria-label="Toggle advanced mode">Advanced Mode</button>
       </div>
     </header>
 
     <nav class="nav">
       <div class="container">
-        <div class="controls">
+        <div class="nav-left">
           <a href="./index" class="btn-compare">← Home</a>
+        </div>
+        <div class="nav-right">
+          <button id="addDieRollBtn" class="btn-add">Add Die Roll</button>
+          <button id="advancedToggle" class="advanced-toggle" aria-label="Toggle advanced mode">Advanced Mode</button>
         </div>
       </div>
     </nav>
@@ -83,9 +86,6 @@
                   <div class="dice-visual raid-visual"></div>
                   <button class="dice-clear-btn raid-clear" title="Clear all Raid dice">×</button>
                 </div>
-              </div>
-              <div class="add-roll-section">
-                <button id="addDieRollBtn" class="btn-add">Add Die Roll</button>
               </div>
             </div>
             <div id="customProbSection"></div>
