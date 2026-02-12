@@ -589,11 +589,43 @@
 }
 
 .bell-curves-title {
-  margin: 0 0 20px 0;
+  margin: 0;
   font-size: 1.4rem;
   font-weight: 600;
   color: var(--text);
-  text-align: center;
+}
+
+.bell-curves-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.histogram-mode {
+  position: absolute;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.histogram-mode select {
+  background: var(--bg-solid);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.histogram-mode select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 .bell-curves-container {

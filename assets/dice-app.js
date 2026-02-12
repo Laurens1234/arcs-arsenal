@@ -202,7 +202,7 @@ function updateResults() {
   // Define all icon types with their display names and image paths
   const allIcons = [
     { key: 'hit', name: 'Hits', image: './dice/images/hit.png' },
-    { key: 'selfhit', name: 'Damage to Self', image: './dice/images/selfhit.png' },
+    { key: 'selfhit', name: 'Self hits', image: './dice/images/selfhit.png' },
     { key: 'intercept', name: 'Intercept', image: './dice/images/intercept.png' },
     { key: 'key', name: 'Keys', image: './dice/images/key.png' },
     { key: 'buildinghit', name: 'Building Hits', image: './dice/images/buildinghit.png' }
@@ -299,11 +299,20 @@ function updateResults() {
   // Update bell curves section
   const bellCurvesEl = document.getElementById('bellCurvesSection');
   if (totalDice > 0) {
+    const existingMode = document.getElementById('histogramMode')?.value || 'exact';
     const bellCurves = allIcons.map(icon => {
       const pmf = computePMF(icon.key, assault, skirmish, raid);
       
-      // Skip leading zero probability bars for better visualization
-      let chartPMF = pmf;
+      // Convert PMF based on mode
+      let displayPMF = pmf;
+      if (existingMode === 'atleast') {
+        displayPMF = pmf.map((_, i) => computeProbabilityAtLeastN(icon.key, assault, skirmish, raid, i));
+      } else if (existingMode === 'atmost') {
+        displayPMF = pmf.map((_, i) => pmf.slice(0, i + 1).reduce((sum, p) => sum + p, 0));
+      }
+      
+      // Skip leading/trailing based on mode
+      let chartPMF = displayPMF;
       let offset = 0;
       while (chartPMF.length > 0 && chartPMF[0] === 0) {
         chartPMF = chartPMF.slice(1);
@@ -316,18 +325,7 @@ function updateResults() {
       
       const maxProb = Math.max(...chartPMF);
       
-      // Don't show chart if one outcome has 100% probability
-      if (maxProb === 1) {
-        return `
-          <div class="bell-curve-item">
-            <div class="bell-curve-header">
-              <img src="${icon.image}" alt="${icon.name}" class="bell-curve-icon">
-              <span>${icon.name}</span>
-            </div>
-            <div class="bell-curve-deterministic">100% chance of ${pmf.indexOf(1)} ${icon.name.toLowerCase()}(s)</div>
-          </div>
-        `;
-      }
+      // Always show the chart
       
       // Calculate bar width based on number of bars and available space
       const numBars = chartPMF.length;
@@ -353,10 +351,11 @@ function updateResults() {
         const i = idx + offset;
         const height = maxProb > 0 ? (p / maxProb) * 120 : 0; // 120px max height
         const percent = (p * 100).toFixed(1);
+        const label = existingMode === 'atleast' ? `≥${i}` : existingMode === 'atmost' ? `≤${i}` : i;
         return `
           <div class="bell-curve-bar-container" style="width: ${barWidth};">
             <div class="bell-curve-bar" style="height: ${height}px;" title="${i}: ${percent}%"></div>
-            <div class="bell-curve-label">${i}</div>
+            <div class="bell-curve-label">${label}</div>
             <div class="bell-curve-percent">${percent}%</div>
           </div>
         `;
@@ -374,9 +373,23 @@ function updateResults() {
     }).join('');
 
     bellCurvesEl.innerHTML = `
-      <h3 class="bell-curves-title">Probability Distributions</h3>
+      <div class="bell-curves-header">
+        <h3 class="bell-curves-title">Probability Distributions</h3>
+        <label class="histogram-mode">
+          <span>Mode:</span>
+          <select id="histogramMode">
+            <option value="exact">Exact</option>
+            <option value="atleast">At Least</option>
+            <option value="atmost">At Most</option>
+          </select>
+        </label>
+      </div>
       <div class="bell-curves-container">${bellCurves}</div>
     `;
+    // Set the mode and add listener
+    const histogramMode = document.getElementById('histogramMode');
+    histogramMode.value = existingMode;
+    histogramMode.addEventListener('change', updateResults);
     bellCurvesEl.style.display = 'block';
   } else {
     bellCurvesEl.innerHTML = '';
