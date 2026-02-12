@@ -111,7 +111,8 @@ function countRolledIcons() {
   if (document.getElementById('signalBreaker').checked) {
     effectiveIntercept = Math.max(0, effectiveIntercept - 1);
   }
-  if (document.getElementById('mirrorPlating').checked) {
+  const assaultDiceCount = Array.from(document.querySelectorAll('.assault-visual')).reduce((sum, v) => sum + v.children.length, 0);
+  if (document.getElementById('mirrorPlating').checked && assaultDiceCount > 0) {
     effectiveIntercept += 1;
   }
   iconCounts.intercept = effectiveIntercept;
@@ -167,22 +168,18 @@ function computeExpectedValue(icon, assaultDiceCount, skirmishDiceCount, raidDic
 
   // Apply intercept modifiers to EV
   if (icon === 'intercept') {
-    if (document.getElementById('signalBreaker').checked) {
-      expected = Math.max(0, expected - 1);
-    }
-    if (document.getElementById('mirrorPlating').checked) {
-      expected += 1;
-    }
+    // Compute accurate EV using PMF with modifiers
+    const pmf = computePMF('intercept', assaultDiceCount, skirmishDiceCount, raidDiceCount);
+    expected = pmf.reduce((sum, p, i) => sum + i * p, 0);
   }
 
   // Add extra self-hits from intercepts
   if (icon === 'selfhit') {
     const multiplier = parseInt(document.getElementById('interceptMultiplier').value) || 0;
-    // Approximate: add multiplier if expected intercept > 0
-    const interceptEV = computeExpectedValue('intercept', assaultDiceCount, 0, raidDiceCount);
-    if (interceptEV > 0) {
-      expected += multiplier;
-    }
+    // Compute accurate additional EV using intercept PMF
+    const interceptPMF = computePMF('intercept', assaultDiceCount, 0, raidDiceCount);
+    const pIntercept = 1 - (interceptPMF[0] || 0);
+    expected += multiplier * pIntercept;
   }
   
   return expected;
@@ -226,12 +223,13 @@ function updateResults() {
   // Generate results for all icons
   const results = allIcons.map(icon => {
     const expected = computeExpectedValue(icon.key, assault, skirmish, raid);
-    const prob = operator === 'gte' ? computeProbabilityAtLeastN(icon.key, assault, skirmish, raid, threshold) : 1 - computeProbabilityAtLeastN(icon.key, assault, skirmish, raid, threshold + 1);
+    // Compute PMF for both probability and chart
+    const pmf = computePMF(icon.key, assault, skirmish, raid);
+    const prob = operator === 'gte' ? pmf.slice(threshold).reduce((sum, p) => sum + p, 0) : pmf.slice(0, threshold + 1).reduce((sum, p) => sum + p, 0);
     const percent = round(prob, true);
     const rolledCount = totalRolled[icon.key] || 0;
 
     // Compute PMF for chart
-    const pmf = computePMF(icon.key, assault, skirmish, raid);
     const maxProb = Math.max(...pmf);
     const chartBars = pmf.map((p, i) => {
       const height = maxProb > 0 ? (p / maxProb) * 20 : 0; // 20px max height
@@ -260,6 +258,7 @@ function updateResults() {
             <option value="lte">≤</option>
           </select>
           <select id="thresholdSelect" class="header-select">
+            <option value="0">0</option>
             <option value="1">1</option>
             <option value="2">2</option>
             <option value="3">3</option>
@@ -302,7 +301,20 @@ function updateResults() {
   if (totalDice > 0) {
     const bellCurves = allIcons.map(icon => {
       const pmf = computePMF(icon.key, assault, skirmish, raid);
-      const maxProb = Math.max(...pmf);
+      
+      // Skip leading zero probability bars for better visualization
+      let chartPMF = pmf;
+      let offset = 0;
+      while (chartPMF.length > 0 && chartPMF[0] === 0) {
+        chartPMF = chartPMF.slice(1);
+        offset++;
+      }
+      // Trim trailing zeros
+      while (chartPMF.length > 0 && chartPMF[chartPMF.length - 1] === 0) {
+        chartPMF.pop();
+      }
+      
+      const maxProb = Math.max(...chartPMF);
       
       // Don't show chart if one outcome has 100% probability
       if (maxProb === 1) {
@@ -318,7 +330,7 @@ function updateResults() {
       }
       
       // Calculate bar width based on number of bars and available space
-      const numBars = pmf.length;
+      const numBars = chartPMF.length;
       const maxTotalWidth = 600; // Maximum total width for all bars in pixels
       const minBarWidth = 30; // Minimum bar width
       const maxBarWidth = 120; // Maximum bar width
@@ -337,7 +349,8 @@ function updateResults() {
       
       barWidth = `${barWidth}px`;
       
-      const chartBars = pmf.map((p, i) => {
+      const chartBars = chartPMF.map((p, idx) => {
+        const i = idx + offset;
         const height = maxProb > 0 ? (p / maxProb) * 120 : 0; // 120px max height
         const percent = (p * 100).toFixed(1);
         return `
@@ -393,9 +406,13 @@ function updateResults() {
             <img src="${icon.image}" alt="${icon.name}" class="custom-prob-icon">
             <span class="custom-prob-name">${icon.name}</span>
             <label>Min:</label>
-            <input type="number" id="min-${icon.key}" class="custom-prob-input" min="0" value="${currentValues[icon.key]?.min || 0}">
+            <select id="min-${icon.key}" class="custom-prob-input">
+              ${Array.from({length: 21}, (_, i) => `<option value="${i}" ${currentValues[icon.key]?.min == i ? 'selected' : ''}>${i}</option>`).join('')}
+            </select>
             <label>Max:</label>
-            <input type="number" id="max-${icon.key}" class="custom-prob-input" min="0" value="${currentValues[icon.key]?.max || 999}">
+            <select id="max-${icon.key}" class="custom-prob-input">
+              ${Array.from({length: 21}, (_, i) => `<option value="${i}" ${currentValues[icon.key]?.max == i ? 'selected' : ''}>${i}</option>`).join('')}
+            </select>
             <span class="custom-prob-result" id="result-${icon.key}">0%</span>
           </div>
         `).join('')}
@@ -637,17 +654,16 @@ function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
 
   // Apply intercept modifiers
   if (icon === 'intercept') {
-    if (document.getElementById('signalBreaker').checked) {
-      dice1Sides = dice1Sides.map(x => Math.max(0, x - 1));
-      dice2Sides = dice2Sides.map(x => Math.max(0, x - 1));
-    }
-    if (document.getElementById('mirrorPlating').checked) {
-      dice1Sides = dice1Sides.map(x => x + 1);
-      dice2Sides = dice2Sides.map(x => x + 1);
-    }
+    // Modifiers are now applied to the PMF after computation
   }
 
   const maxSum = Math.max(...dice1Sides) * countDice1 + Math.max(...dice2Sides) * countDice2;
+
+  // Adjust maxSum for mirror plating
+  let adjustedMaxSum = maxSum;
+  if (icon === 'intercept' && document.getElementById('mirrorPlating').checked) {
+    adjustedMaxSum += countDice1 + countDice2; // +1 per die
+  }
 
   const pmf = (sides) => {
     const counts = {};
@@ -662,15 +678,15 @@ function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
     return probabilities;
   };
 
-  const P1 = Array(maxSum + 1).fill(0);
-  const P2 = Array(maxSum + 1).fill(0);
+  const P1 = Array(adjustedMaxSum + 1).fill(0);
+  const P2 = Array(adjustedMaxSum + 1).fill(0);
   P1[0] = 1;
   P2[0] = 1;
 
   const updateProbabilities = (P, pmf, diceCount) => {
     for (let i = 1; i <= diceCount; i++) {
-      const newP = Array(maxSum + 1).fill(0);
-      for (let s = 0; s <= maxSum; s++) {
+      const newP = Array(adjustedMaxSum + 1).fill(0);
+      for (let s = 0; s <= adjustedMaxSum; s++) {
         for (const [side, prob] of Object.entries(pmf)) {
           const sideNum = parseInt(side);
           if (s >= sideNum) {
@@ -678,7 +694,7 @@ function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
           }
         }
       }
-      for (let s = 0; s <= maxSum; s++) {
+      for (let s = 0; s <= adjustedMaxSum; s++) {
         P[s] = newP[s];
       }
     }
@@ -687,10 +703,39 @@ function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
   updateProbabilities(P1, pmf(dice1Sides), countDice1);
   updateProbabilities(P2, pmf(dice2Sides), countDice2);
 
-  const pmfResult = Array(maxSum + 1).fill(0);
-  for (let s = 0; s <= maxSum; s++) {
+  const pmfResult = Array(adjustedMaxSum + 1).fill(0);
+  for (let s = 0; s <= adjustedMaxSum; s++) {
     for (let x = 0; x <= s; x++) {
       pmfResult[s] += P1[x] * P2[s - x];
+    }
+  }
+
+  // Apply intercept modifiers to the final PMF
+  if (icon === 'intercept') {
+    if (document.getElementById('signalBreaker').checked) {
+      // Shift PMF down by 1 (ignore one intercept)
+      const newPMF = Array(adjustedMaxSum + 1).fill(0);
+      for (let s = 0; s <= adjustedMaxSum; s++) {
+        if (s > 0) {
+          newPMF[s - 1] += pmfResult[s];
+        } else {
+          newPMF[0] += pmfResult[0];
+        }
+      }
+      for (let s = 0; s <= adjustedMaxSum; s++) {
+        pmfResult[s] = newPMF[s];
+      }
+    }
+    if (document.getElementById('mirrorPlating').checked && countDice1 > 0) {
+      // Shift PMF up by 1 (only if assault dice are present)
+      const newPMF = Array(adjustedMaxSum + 2).fill(0);
+      for (let s = 0; s <= adjustedMaxSum; s++) {
+        newPMF[s + 1] += pmfResult[s];
+      }
+      pmfResult.length = adjustedMaxSum + 2;
+      for (let s = 0; s < pmfResult.length; s++) {
+        pmfResult[s] = newPMF[s];
+      }
     }
   }
 
@@ -830,7 +875,12 @@ function computeProbabilityAtLeastN(icon, assaultDiceCount, skirmishDiceCount, r
     countDice2 = raidDiceCount;
   }
 
-  const maxSum = Math.max(desiredSum - 1, Math.max(...dice1Sides) * countDice1 + Math.max(...dice2Sides) * countDice2);
+  let maxSum = Math.max(desiredSum - 1, Math.max(...dice1Sides) * countDice1 + Math.max(...dice2Sides) * countDice2);
+
+  // Adjust maxSum for mirror plating
+  if (icon === 'intercept' && document.getElementById('mirrorPlating').checked) {
+    maxSum += countDice1 + countDice2;
+  }
 
   const pmf = (sides) => {
     const counts = {};
@@ -880,9 +930,38 @@ function computeProbabilityAtLeastN(icon, assaultDiceCount, skirmishDiceCount, r
     }
   }
 
+  // Apply intercept modifiers to the PMF
+  if (icon === 'intercept') {
+    if (document.getElementById('signalBreaker').checked) {
+      // Shift PMF down by 1
+      const newPMF = Array(maxSum + 1).fill(0);
+      for (let s = 0; s <= maxSum; s++) {
+        if (s > 0) {
+          newPMF[s - 1] += PCombined[s];
+        } else {
+          newPMF[0] += PCombined[0];
+        }
+      }
+      for (let s = 0; s <= maxSum; s++) {
+        PCombined[s] = newPMF[s];
+      }
+    }
+    if (document.getElementById('mirrorPlating').checked) {
+      // Shift PMF up by 1
+      const newPMF = Array(maxSum + 2).fill(0);
+      for (let s = 0; s <= maxSum; s++) {
+        newPMF[s + 1] += PCombined[s];
+      }
+      PCombined.length = maxSum + 2;
+      for (let s = 0; s < PCombined.length; s++) {
+        PCombined[s] = newPMF[s];
+      }
+    }
+  }
+
   let probability = 0;
-  for (let s = desiredSum; s <= maxSum; s++) {
-    probability += PCombined[s];
+  for (let s = desiredSum; s < PCombined.length; s++) {
+    probability += PCombined[s] || 0;
   }
 
   if (probability < 0.0000009) {
@@ -1026,11 +1105,9 @@ function createDieElement(type, faceIndex = null) {
     die.style.backgroundSize = 'contain';
     die.style.backgroundRepeat = 'no-repeat';
     die.style.backgroundPosition = 'center';
-    die.title = `${type.charAt(0).toUpperCase() + type.slice(1)} Die - Unrolled`;
   } else {
     // Fallback to full image
     die.style.backgroundImage = `url(${data ? data.image : './dice/images/' + type + '-die.png'})`;
-    die.title = `${type.charAt(0).toUpperCase() + type.slice(1)} Die`;
   }
   
   // Add text overlay with first letter of dice type
