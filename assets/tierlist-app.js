@@ -85,6 +85,11 @@ function normalizeText(s) {
   return String(s ?? "").trim().toLowerCase().replace(/['']/g, "'").replace(/\s+/g, " ");
 }
 
+function arraysEqual(a, b) {
+  if (a.length !== b.length) return false;
+  return a.every((val, index) => JSON.stringify(val) === JSON.stringify(b[index]));
+}
+
 async function fetchText(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Fetch failed ${res.status}: ${url}`);
@@ -1373,9 +1378,6 @@ function toggleEditMode() {
   document.body.classList.toggle("edit-mode", editMode);
   el.editBtn.textContent = editMode ? "✅ Done" : "Edit";
   el.clearBtn.style.display = editMode ? "" : "none";
-  el.importBtn.style.display = editMode ? "" : "none";
-  el.exportBtn.style.display = editMode ? "" : "none";
-  el.shareBtn.style.display = editMode ? "" : "none";
   // Clear visible empty tiers when entering edit mode
   if (editMode) {
     visibleEmptyTiers.clear();
@@ -2133,7 +2135,7 @@ function updateMetaTagsForSharedTierList(encoded) {
   }
 }
 
-function shareTierList() {
+async function shareTierList() {
   populateShareModal();
   el.shareModal.classList.remove('hidden');
 }
@@ -2180,7 +2182,10 @@ function populateShareModal() {
   });
 }
 
-function confirmShare() {
+async function confirmShare() {
+  // Load the default tier list
+  const defaultTierData = await loadDefaultTierList();
+
   const selectedSections = [];
   
   // Collect selected sections
@@ -2190,15 +2195,16 @@ function confirmShare() {
     const nameInput = document.getElementById(`name-${sectionId}`);
     const customName = nameInput.value.trim() || nameInput.placeholder;
     
-    let data;
+    let data, defaultData;
     switch (sectionId) {
-      case 'leaders3p': data = leaderEntries3P; break;
-      case 'leaders4p': data = leaderEntries4P; break;
-      case 'lore': data = loreEntries; break;
-      case 'basecourt': data = basecourtEntries; break;
+      case 'leaders3p': data = leaderEntries3P; defaultData = defaultTierData.leaders3P; break;
+      case 'leaders4p': data = leaderEntries4P; defaultData = defaultTierData.leaders4P; break;
+      case 'lore': data = loreEntries; defaultData = defaultTierData.lore; break;
+      case 'basecourt': data = basecourtEntries; defaultData = defaultTierData.basecourt; break;
     }
     
-    if (data && data.length > 0) {
+    // Only include if data exists and differs from default
+    if (data && data.length > 0 && !arraysEqual(data, defaultData)) {
       selectedSections.push({
         id: sectionId,
         name: customName,
@@ -2208,7 +2214,15 @@ function confirmShare() {
   });
   
   if (selectedSections.length === 0) {
-    alert('Please select at least one tier list to share.');
+    // All selected sections are default, share base URL
+    const url = new URL(window.location);
+    url.searchParams.delete('tierlist');
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      alert('Shareable link to default tier list copied to clipboard!');
+    }).catch(() => {
+      alert(`Shareable link: ${url.toString()}`);
+    });
+    el.shareModal.classList.add('hidden');
     return;
   }
   
