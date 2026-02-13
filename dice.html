@@ -122,6 +122,40 @@
           </div>
           <div id="result" class="calc-result"></div>
           <div class="intercept-config" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px;">
+            <label for="skirmishRerolls">Skirmisher rerolls:</label>
+            <select id="skirmishRerolls" class="header-select">
+              <option value="0" selected>0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+            <label for="assaultRerolls">Seeker Torpedoes rerolls:</label>
+            <select id="assaultRerolls" class="header-select">
+              <option value="0" selected>0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+            <button id="assaultRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Seeker Faces</button>
+            <label for="raidRerolls">Corsair rerolls:</label>
+            <select id="raidRerolls" class="header-select">
+              <option value="0" selected>0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+            <button id="raidRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Corsair Faces</button>
+            <label style="font-size: 0.9em;"><input type="checkbox" id="empathVision"> Empath's Vision</label>
+            <button id="empathRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Empath Faces</button>
             <label for="interceptMultiplier">Self-hits if Intercepted:</label>
             <select id="interceptMultiplier" class="header-select">
               <option value="0" selected>0</option>
@@ -153,6 +187,38 @@
         </div>
       </div>
     </main>
+
+    <div id="assaultRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Drag to reorder faces by priority (top = highest priority)</p>        <div id="assaultFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="assaultRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="assaultRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="raidRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Drag to reorder faces by priority (top = highest priority)</p>        <div id="raidFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="raidRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="raidRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="empathRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>
+        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Click faces to select which ones should be rerolled when Empath's Vision is active.</p>
+        <div id="empathFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="empathRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="empathRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <footer class="footer">
       <div class="container">

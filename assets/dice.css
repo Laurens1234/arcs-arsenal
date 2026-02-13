@@ -840,3 +840,100 @@
   color: var(--accent);
   font-size: 1.1rem;
 }
+
+/* Modal styles */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+  background-color: var(--bg-card);
+  margin: 15% auto;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  width: 80%;
+  max-width: 400px;
+  border: 1px solid var(--border);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: var(--text);
+}
+
+#assaultFacesCheckboxes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.face-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: move;
+  background: var(--bg-solid);
+  transition: background 0.2s, border-color 0.2s;
+  user-select: none;
+}
+
+.face-option.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.face-option.dragging {
+  opacity: 0.8;
+  transform: rotate(5deg);
+}
+
+.face-label {
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+/* Modal button styles */
+.btn-modal-primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-right: 10px;
+}
+
+.btn-modal-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-modal-secondary {
+  background: var(--bg-solid);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-glow);
+}

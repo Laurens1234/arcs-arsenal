@@ -34,6 +34,23 @@ const RaidDie = {
   ]
 };
 
+// Selected faces for assault rerolls
+const selectedAssaultFaces = new Set([0]); // Face 1 enabled by default
+
+// Selected faces for raid rerolls
+const selectedRaidFaces = new Set([2, 3, 5]); // Faces 3, 4, 6 enabled by default
+
+// Selected faces for empath rerolls (separate for each die type)
+const selectedAssaultEmpathFaces = new Set([0]); // Face 1 enabled by default for assault
+const selectedSkirmishEmpathFaces = new Set([0, 1, 2]); // Faces 1, 2, 3 enabled by default for skirmish (linked)
+const selectedRaidEmpathFaces = new Set([2, 3, 5]); // Faces 3, 4, 6 enabled by default for raid (linked)
+
+// Priority order for assault faces (0-5, higher index = lower priority)
+let assaultFacePriority = [0, 1, 5, 2, 3, 4]; // Faces 1,2,6,3,4,5
+
+// Priority order for raid faces (0-5, higher index = lower priority)
+let raidFacePriority = [2, 3, 5, 1, 4, 0]; // Faces 3,4,6,2,5,1
+
 // Total rolled icons across multiple rolls
 let totalRolled = { hit: 0, selfhit: 0, intercept: 0, key: 0, buildinghit: 0 };
 
@@ -141,47 +158,12 @@ function round(num, toPercent = false) {
 
 // Compute expected value for an icon
 function computeExpectedValue(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
-  const assault = AssaultDie.sides.map(side => side.count[icon]);
-  const skirmish = SkirmishDie.sides.map(side => side.count[icon]);
-  const raid = RaidDie.sides.map(side => side.count[icon]);
-
+  // Use PMF for all icons so rerolls are accounted for consistently
+  const pmf = computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount);
   let expected = 0;
-  
-  // Add expected value from assault dice
-  for (let i = 0; i < assaultDiceCount; i++) {
-    expected += assault.reduce((sum, val) => sum + val, 0) / assault.length;
+  for (let i = 0; i < pmf.length; i++) {
+    expected += i * pmf[i];
   }
-  
-  // Add expected value from skirmish dice (only for hit)
-  if (icon === 'hit') {
-    for (let i = 0; i < skirmishDiceCount; i++) {
-      expected += skirmish.reduce((sum, val) => sum + val, 0) / skirmish.length;
-    }
-  }
-  
-  // Add expected value from raid dice (for key, selfhit, intercept, buildinghit)
-  if (icon !== 'hit') {
-    for (let i = 0; i < raidDiceCount; i++) {
-      expected += raid.reduce((sum, val) => sum + val, 0) / raid.length;
-    }
-  }
-
-  // Apply intercept modifiers to EV
-  if (icon === 'intercept') {
-    // Compute accurate EV using PMF with modifiers
-    const pmf = computePMF('intercept', assaultDiceCount, skirmishDiceCount, raidDiceCount);
-    expected = pmf.reduce((sum, p, i) => sum + i * p, 0);
-  }
-
-  // Add extra self-hits from intercepts
-  if (icon === 'selfhit') {
-    const multiplier = parseInt(document.getElementById('interceptMultiplier').value) || 0;
-    // Compute accurate additional EV using intercept PMF
-    const interceptPMF = computePMF('intercept', assaultDiceCount, 0, raidDiceCount);
-    const pIntercept = 1 - (interceptPMF[0] || 0);
-    expected += multiplier * pIntercept;
-  }
-  
   return expected;
 }
 
@@ -475,8 +457,14 @@ function updateResults() {
 
     // Function to update combined probability
     const updateCombined = () => {
-      const numSimulations = 10000;
+      const numInputEl = document.getElementById('numSimulationsInput');
+      const numSimulations = numInputEl ? Math.max(1000, parseInt(numInputEl.value) || 40000) : 40000;
       let successCount = 0;
+
+      const skirmishRerolls = parseInt(document.getElementById('skirmishRerolls').value) || 0;
+      const assaultRerolls = parseInt(document.getElementById('assaultRerolls').value) || 0;
+      const raidRerolls = parseInt(document.getElementById('raidRerolls').value) || 0;
+      const empathVision = document.getElementById('empathVision').checked;
 
       // Get min/max for each icon
       const ranges = {};
@@ -493,17 +481,155 @@ function updateResults() {
         { type: 'raid', count: raid, die: RaidDie }
       ];
 
+      console.debug('Combined calc config', {
+        assault, skirmish, raid,
+        assaultRerolls, skirmishRerolls, raidRerolls,
+        selectedAssaultFaces: Array.from(selectedAssaultFaces),
+        selectedRaidFaces: Array.from(selectedRaidFaces),
+        selectedAssaultEmpathFaces: Array.from(selectedAssaultEmpathFaces),
+        selectedSkirmishEmpathFaces: Array.from(selectedSkirmishEmpathFaces),
+        selectedRaidEmpathFaces: Array.from(selectedRaidEmpathFaces),
+        raidFacePriority,
+        assaultFacePriority
+      });
+
+      const iconSuccessCounts = {};
+      allIcons.forEach(icon => iconSuccessCounts[icon.key] = 0);
+
+      // (no in-page sample logs)
+
       for (let sim = 0; sim < numSimulations; sim++) {
         const totals = { hit: 0, selfhit: 0, intercept: 0, key: 0, buildinghit: 0 };
+        const assaultResults = [];
+        const skirmishResults = [];
+        const raidResults = [];
 
         // Roll all dice
         dicePools.forEach(pool => {
           for (let d = 0; d < pool.count; d++) {
-            const face = pool.die.sides[Math.floor(Math.random() * 6)];
-            Object.keys(totals).forEach(icon => {
-              totals[icon] += face.count[icon] || 0;
-            });
+            const faceIndex = Math.floor(Math.random() * 6);
+            const face = pool.die.sides[faceIndex];
+            if (pool.type === 'assault') {
+              assaultResults.push({ faceIndex, count: face.count });
+            } else if (pool.type === 'skirmish') {
+              skirmishResults.push(face.count);
+            } else if (pool.type === 'raid') {
+              raidResults.push({ faceIndex, count: face.count });
+            }
           }
+        });
+
+        // Sequential rerolls: 1) Empath's Vision (global) 2) Targeted rerolls (assault, raid, skirmish)
+        // Apply Empath rerolls first so targeted reroll candidate selection uses Empath results
+        const beforeEmpathSnapshot = {
+          assault: assaultResults.map(r => r.faceIndex),
+          skirmish: skirmishResults.map(f => {
+            return SkirmishDie.sides.findIndex(s => s.count.hit === f.hit && s.count.selfhit === f.selfhit);
+          }),
+          raid: raidResults.map(r => r.faceIndex)
+        };
+
+        if (empathVision) {
+          // Assault empath rerolls
+          assaultResults.forEach((result, i) => {
+            if (selectedAssaultEmpathFaces.has(result.faceIndex)) {
+              const newFaceIndex = Math.floor(Math.random() * 6);
+              const newFace = AssaultDie.sides[newFaceIndex];
+              assaultResults[i] = { faceIndex: newFaceIndex, count: newFace.count };
+            }
+          });
+
+          // Skirmish empath rerolls
+          skirmishResults.forEach((face, i) => {
+            const faceIndex = SkirmishDie.sides.findIndex(s => s.count.hit === face.hit && s.count.selfhit === face.selfhit);
+            if (selectedSkirmishEmpathFaces.has(faceIndex)) {
+              const newFace = SkirmishDie.sides[Math.floor(Math.random() * 6)];
+              skirmishResults[i] = newFace.count;
+            }
+          });
+
+          // Raid empath rerolls
+          raidResults.forEach((result, i) => {
+            if (selectedRaidEmpathFaces.has(result.faceIndex)) {
+              const newFaceIndex = Math.floor(Math.random() * 6);
+              const newFace = RaidDie.sides[newFaceIndex];
+              raidResults[i] = { faceIndex: newFaceIndex, count: newFace.count };
+            }
+          });
+        }
+
+        const afterEmpathSnapshot = {
+          assault: assaultResults.map(r => r.faceIndex),
+          skirmish: skirmishResults.map(f => {
+            return SkirmishDie.sides.findIndex(s => s.count.hit === f.hit && s.count.selfhit === f.selfhit);
+          }),
+          raid: raidResults.map(r => r.faceIndex)
+        };
+
+        if (sim < 3) console.debug('empath reroll sample', { sim, beforeEmpathSnapshot, afterEmpathSnapshot });
+
+        // Now perform targeted rerolls in a defined sequence: assault -> raid -> skirmish
+
+        // Assault targeted rerolls (Seeker)
+        const assaultCandidates = [];
+        assaultResults.forEach((result, i) => {
+          if (selectedAssaultFaces.has(result.faceIndex)) assaultCandidates.push(i);
+        });
+        assaultCandidates.sort((a, b) => assaultFacePriority.indexOf(assaultResults[a].faceIndex) - assaultFacePriority.indexOf(assaultResults[b].faceIndex));
+        const assaultRerolled = assaultCandidates.slice(0, assaultRerolls);
+        assaultRerolled.forEach(i => {
+          const newFaceIndex = Math.floor(Math.random() * 6);
+          const newFace = AssaultDie.sides[newFaceIndex];
+          assaultResults[i] = { faceIndex: newFaceIndex, count: newFace.count };
+        });
+        if (sim < 3) console.debug('assault reroll sample', { sim, assaultCandidates, assaultRerolled });
+
+        // Raid targeted rerolls (Corsair)
+        const raidCandidates = [];
+        raidResults.forEach((result, i) => {
+          if (selectedRaidFaces.has(result.faceIndex)) raidCandidates.push(i);
+        });
+        raidCandidates.sort((a, b) => raidFacePriority.indexOf(raidResults[a].faceIndex) - raidFacePriority.indexOf(raidResults[b].faceIndex));
+        const raidRerolled = raidCandidates.slice(0, raidRerolls);
+        raidRerolled.forEach(i => {
+          const newFaceIndex = Math.floor(Math.random() * 6);
+          const newFace = RaidDie.sides[newFaceIndex];
+          raidResults[i] = { faceIndex: newFaceIndex, count: newFace.count };
+        });
+        if (sim < 3) console.debug('raid reroll sample', { sim, raidCandidates, raidRerolled });
+
+        // Skirmish targeted rerolls (reroll misses)
+        let remainingSkirmishRerolls = skirmishRerolls;
+        const skirmishRerolledIdx = [];
+        for (let i = 0; i < skirmishResults.length && remainingSkirmishRerolls > 0; i++) {
+          if (skirmishResults[i].hit === 0) {
+            const newFace = SkirmishDie.sides[Math.floor(Math.random() * 6)];
+            skirmishResults[i] = newFace.count;
+            skirmishRerolledIdx.push(i);
+            remainingSkirmishRerolls--;
+          }
+        }
+        if (sim < 3) console.debug('skirmish reroll sample', { sim, skirmishRerolledIdx });
+
+        // Sum assault results
+        assaultResults.forEach(result => {
+          Object.keys(totals).forEach(icon => {
+            totals[icon] += result.count[icon] || 0;
+          });
+        });
+
+        // Sum skirmish results
+        skirmishResults.forEach(face => {
+          Object.keys(totals).forEach(icon => {
+            totals[icon] += face[icon] || 0;
+          });
+        });
+
+        // Sum raid results
+        raidResults.forEach(result => {
+          Object.keys(totals).forEach(icon => {
+            totals[icon] += result.count[icon] || 0;
+          });
         });
 
         // Apply intercept modifiers
@@ -521,20 +647,43 @@ function updateResults() {
           totals.selfhit += multiplier;
         }
 
-        // Check if all conditions are met
+        // Track per-icon condition satisfaction and combined condition
         let allMet = true;
         for (const icon of allIcons) {
           const { min, max } = ranges[icon.key];
-          if (totals[icon.key] < min || totals[icon.key] > max) {
-            allMet = false;
-            break;
-          }
+          const met = totals[icon.key] >= min && totals[icon.key] <= max;
+          if (met) iconSuccessCounts[icon.key]++;
+          if (!met) allMet = false;
         }
         if (allMet) successCount++;
       }
 
-      const prob = successCount / numSimulations;
-      document.getElementById('combinedResult').textContent = round(prob, true) + '%';
+      // Compute simulated marginal probabilities and compare to PMF-derived marginals
+      const simulatedMarginals = {};
+      allIcons.forEach(icon => {
+        simulatedMarginals[icon.key] = iconSuccessCounts[icon.key] / numSimulations;
+      });
+
+      const pmfMarginals = {};
+      allIcons.forEach(icon => {
+        const pmf = computePMF(icon.key, assault, skirmish, raid);
+        const { min, max } = ranges[icon.key];
+        let p = 0;
+        for (let i = Math.max(0, min); i <= Math.min(max, pmf.length - 1); i++) p += pmf[i] || 0;
+        pmfMarginals[icon.key] = p;
+      });
+
+      console.debug('combined marginal comparison', { simulatedMarginals, pmfMarginals });
+
+      // Also render a visible debug panel under the custom probability section
+      console.debug('combined marginal comparison', { simulatedMarginals, pmfMarginals });
+
+      const p = successCount / numSimulations;
+      const se = Math.sqrt(p * (1 - p) / numSimulations);
+      const ci95 = 1.96 * se;
+      const combinedEl = document.getElementById('combinedResult');
+      combinedEl.textContent = `${round(p, true)}%`;
+      combinedEl.title = `95% CI ±${round(ci95, true)}% (N=${numSimulations})`;
     };
 
     // Add event listener for combined calculation button (optional, since auto-updates)
@@ -544,80 +693,262 @@ function updateResults() {
   }
 }
 
+// Compute skirmish PMF with rerolls
+function computeSkirmishPMF(icon, numDice, numRerolls, empathFaces = new Set()) {
+  if (numDice === 0) return [1];
+  
+  // Calculate effective probabilities after Empath's Vision rerolls (at most once)
+  const effectiveProbs = new Array(6).fill(0);
+  const selectedCount = empathFaces.size;
+  
+  if (selectedCount > 0) {
+    // Empath's Vision active: selected faces reroll once
+    const initialProb = 1/6;
+    const rerollProb = selectedCount / 6 * (1/6); // Probability of selecting a face that gets rerolled, then landing on this face
+    
+    for (let i = 0; i < 6; i++) {
+      if (!empathFaces.has(i)) {
+        // Non-selected faces: initial probability + reroll probability
+        effectiveProbs[i] = initialProb + rerollProb;
+      } else {
+        // Selected faces: only from rerolls (since they get rerolled away initially)
+        effectiveProbs[i] = rerollProb;
+      }
+    }
+  } else {
+    // No Empath's Vision
+    for (let i = 0; i < 6; i++) {
+      effectiveProbs[i] = 1/6;
+    }
+  }
+  
+  const maxValue = Math.max(...SkirmishDie.sides.map(side => side.count[icon])) * numDice;
+  const dp = Array(numDice + 1).fill().map(() => Array(numRerolls + 1).fill().map(() => Array(maxValue + 1).fill(0)));
+  dp[0][numRerolls][0] = 1;
+  for (let d = 0; d < numDice; d++) {
+    for (let r = 0; r <= numRerolls; r++) {
+      for (let v = 0; v <= maxValue; v++) {
+        if (dp[d][r][v] === 0) continue;
+        
+        // For each possible face, use effective probabilities
+        for (let f = 0; f < 6; f++) {
+          const face = SkirmishDie.sides[f];
+          const hasHit = face.count.hit > 0;
+          const value = face.count[icon];
+          const prob = effectiveProbs[f];
+          
+          if (hasHit) {
+            // Hit - no reroll
+            if (v + value <= maxValue) {
+              dp[d+1][r][v + value] += dp[d][r][v] * prob;
+            }
+          } else {
+            // Miss - check for reroll
+            if (r > 0) {
+              // Reroll miss
+                for (let g = 0; g < 6; g++) {
+                const rerollFace = SkirmishDie.sides[g];
+                const rerollValue = rerollFace.count[icon];
+                const rerollProb = 1/6; // Rerolls are fresh rolls (Empath does not apply to rerolls)
+                if (v + rerollValue <= maxValue) {
+                  dp[d+1][r-1][v + rerollValue] += dp[d][r][v] * prob * rerollProb;
+                }
+              }
+            } else {
+              // No reroll
+              if (v + value <= maxValue) {
+                dp[d+1][r][v] += dp[d][r][v] * prob;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  const pmf = Array(maxValue + 1).fill(0);
+  for (let r = 0; r <= numRerolls; r++) {
+    for (let v = 0; v <= maxValue; v++) {
+      pmf[v] += dp[numDice][r][v];
+    }
+  }
+  return pmf;
+}
+
+// Compute assault PMF with rerolls for selected faces
+function computeAssaultPMF(icon, numDice, numRerolls, selectedFaces, empathFaces = new Set()) {
+  if (numDice === 0) return [1];
+  
+  // Calculate effective probabilities after Empath's Vision rerolls (at most once)
+  const effectiveProbs = new Array(6).fill(0);
+  const selectedCount = empathFaces.size;
+  const nonSelectedCount = 6 - selectedCount;
+  
+  if (selectedCount > 0) {
+    // Empath's Vision active: selected faces reroll once
+    const initialProb = 1/6;
+    const rerollProb = selectedCount / 6 * (1/6); // Probability of selecting a face that gets rerolled, then landing on this face
+    
+    for (let i = 0; i < 6; i++) {
+      if (!empathFaces.has(i)) {
+        // Non-selected faces: initial probability + reroll probability
+        effectiveProbs[i] = initialProb + rerollProb;
+      } else {
+        // Selected faces: only from rerolls (since they get rerolled away initially)
+        effectiveProbs[i] = rerollProb;
+      }
+    }
+  } else {
+    // No Empath's Vision
+    for (let i = 0; i < 6; i++) {
+      effectiveProbs[i] = 1/6;
+    }
+  }
+  
+  const maxValue = Math.max(...AssaultDie.sides.map(side => side.count[icon])) * numDice;
+  const dp = Array(numDice + 1).fill().map(() => Array(numRerolls + 1).fill().map(() => Array(maxValue + 1).fill(0)));
+  dp[0][numRerolls][0] = 1;
+  for (let d = 0; d < numDice; d++) {
+    for (let r = 0; r <= numRerolls; r++) {
+      for (let v = 0; v <= maxValue; v++) {
+        if (dp[d][r][v] === 0) continue;
+        for (let f = 0; f < 6; f++) {
+          const face = AssaultDie.sides[f];
+          const value = face.count[icon];
+          const prob = effectiveProbs[f];
+          if (selectedFaces.has(f) && r > 0) {
+            // Seeker Torpedoes reroll
+            for (let g = 0; g < 6; g++) {
+              const rerollFace = AssaultDie.sides[g];
+              const rerollValue = rerollFace.count[icon];
+              const rerollProb = 1/6; // Rerolls are fresh rolls (Empath does not apply to rerolls)
+              if (v + rerollValue <= maxValue) {
+                dp[d+1][r-1][v + rerollValue] += dp[d][r][v] * prob * rerollProb;
+              }
+            }
+          } else {
+            // No Seeker Torpedoes reroll
+            if (v + value <= maxValue) {
+              dp[d+1][r][v + value] += dp[d][r][v] * prob;
+            }
+          }
+        }
+      }
+    }
+  }
+  const pmf = Array(maxValue + 1).fill(0);
+  for (let r = 0; r <= numRerolls; r++) {
+    for (let v = 0; v <= maxValue; v++) {
+      pmf[v] += dp[numDice][r][v];
+    }
+  }
+  return pmf;
+}
+
+// Compute raid PMF with rerolls for selected faces
+function computeRaidPMF(icon, numDice, numRerolls, selectedFaces, empathFaces = new Set()) {
+  if (numDice === 0) return [1];
+
+  // Calculate effective probabilities after Empath's Vision rerolls (at most once)
+  const effectiveProbs = new Array(6).fill(0);
+  const selectedCount = empathFaces.size;
+  if (selectedCount > 0) {
+    const initialProb = 1/6;
+    const rerollProb = selectedCount / 6 * (1/6);
+    for (let i = 0; i < 6; i++) {
+      if (!empathFaces.has(i)) {
+        effectiveProbs[i] = initialProb + rerollProb;
+      } else {
+        effectiveProbs[i] = rerollProb;
+      }
+    }
+  } else {
+    for (let i = 0; i < 6; i++) effectiveProbs[i] = 1/6;
+  }
+
+  const maxValue = Math.max(...RaidDie.sides.map(side => side.count[icon])) * numDice;
+  const dp = Array(numDice + 1).fill().map(() => Array(numRerolls + 1).fill().map(() => Array(maxValue + 1).fill(0)));
+  dp[0][numRerolls][0] = 1;
+  for (let d = 0; d < numDice; d++) {
+    for (let r = 0; r <= numRerolls; r++) {
+      for (let v = 0; v <= maxValue; v++) {
+        if (dp[d][r][v] === 0) continue;
+        for (let f = 0; f < 6; f++) {
+          const face = RaidDie.sides[f];
+          const value = face.count[icon];
+          const prob = effectiveProbs[f];
+          if (selectedFaces.has(f) && r > 0) {
+            // Corsair reroll: reroll into any face using effective probs
+            for (let g = 0; g < 6; g++) {
+              const rerollFace = RaidDie.sides[g];
+              const rerollValue = rerollFace.count[icon];
+              const rerollProb = 1/6; // Rerolls are fresh rolls (Empath does not apply to rerolls)
+              if (v + rerollValue <= maxValue) {
+                dp[d+1][r-1][v + rerollValue] += dp[d][r][v] * prob * rerollProb;
+              }
+            }
+          } else {
+            // No reroll
+            if (v + value <= maxValue) {
+              dp[d+1][r][v + value] += dp[d][r][v] * prob;
+            }
+          }
+        }
+      }
+    }
+  }
+  const pmf = Array(maxValue + 1).fill(0);
+  for (let r = 0; r <= numRerolls; r++) {
+    for (let v = 0; v <= maxValue; v++) {
+      pmf[v] += dp[numDice][r][v];
+    }
+  }
+  return pmf;
+}
+
+function convolvePMF(pmf1, pmf2) {
+  const result = Array(pmf1.length + pmf2.length - 1).fill(0);
+  for (let i = 0; i < pmf1.length; i++) {
+    for (let j = 0; j < pmf2.length; j++) {
+      result[i + j] += pmf1[i] * pmf2[j];
+    }
+  }
+  return result;
+}
+
+
+
+function updateProbabilitiesFromPMF(P, diePMF, diceCount) {
+  for (let i = 1; i <= diceCount; i++) {
+    const maxSide = Math.max(...Object.keys(diePMF).map(Number));
+    const newP = Array(P.length + maxSide).fill(0);
+    for (let s = 0; s < P.length; s++) {
+      for (const [side, prob] of Object.entries(diePMF)) {
+        const sideNum = parseInt(side);
+        newP[s + sideNum] += prob * P[s];
+      }
+    }
+    P = newP;
+  }
+  return P;
+}
+
 // Compute probability mass function for an icon
 function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
   if (icon === 'selfhit') {
     const multiplier = parseInt(document.getElementById('interceptMultiplier').value) || 0;
+    const empathVision = document.getElementById('empathVision').checked;
+    const assaultRerolls = parseInt(document.getElementById('assaultRerolls').value) || 0;
+    const raidRerolls = parseInt(document.getElementById('raidRerolls').value) || 0;
     
-    // Compute base selfhit PMF
-    const baseDice1Sides = AssaultDie.sides.map(side => side.count.selfhit);
-    const baseDice2Sides = RaidDie.sides.map(side => side.count.selfhit);
-    const baseMaxSum = Math.max(...baseDice1Sides) * assaultDiceCount + Math.max(...baseDice2Sides) * raidDiceCount;
-    
-    const pmf = (sides) => {
-      const counts = {};
-      const probabilities = {};
-      const totalSides = sides.length;
-      sides.forEach(side => {
-        counts[side] = (counts[side] || 0) + 1;
-      });
-      for (const [side, count] of Object.entries(counts)) {
-        probabilities[parseInt(side)] = count / totalSides;
-      }
-      return probabilities;
-    };
-
-    const P1 = Array(baseMaxSum + 1).fill(0);
-    const P2 = Array(baseMaxSum + 1).fill(0);
-    P1[0] = 1;
-    P2[0] = 1;
-
-    const updateProbabilities = (P, pmf, diceCount) => {
-      for (let i = 1; i <= diceCount; i++) {
-        const newP = Array(baseMaxSum + 1).fill(0);
-        for (let s = 0; s <= baseMaxSum; s++) {
-          for (const [side, prob] of Object.entries(pmf)) {
-            const sideNum = parseInt(side);
-            if (s >= sideNum) {
-              newP[s] += prob * P[s - sideNum];
-            }
-          }
-        }
-        for (let s = 0; s <= baseMaxSum; s++) {
-          P[s] = newP[s];
-        }
-      }
-    };
-
-    updateProbabilities(P1, pmf(baseDice1Sides), assaultDiceCount);
-    updateProbabilities(P2, pmf(baseDice2Sides), raidDiceCount);
-
-    const basePMF = Array(baseMaxSum + 1).fill(0);
-    for (let s = 0; s <= baseMaxSum; s++) {
-      for (let x = 0; x <= s; x++) {
-        basePMF[s] += P1[x] * P2[s - x];
-      }
-    }
+    // Compute base selfhit PMF with rerolls
+    const baseAssaultPMF = assaultDiceCount > 0 ? computeAssaultPMF('selfhit', assaultDiceCount, assaultRerolls, selectedAssaultFaces, empathVision ? selectedAssaultEmpathFaces : new Set()) : [1];
+    const baseRaidPMF = raidDiceCount > 0 ? computeRaidPMF('selfhit', raidDiceCount, raidRerolls, selectedRaidFaces, empathVision ? selectedRaidEmpathFaces : new Set()) : [1];
+    const basePMF = convolvePMF(baseAssaultPMF, baseRaidPMF);
+    const baseMaxSum = basePMF.length - 1;
 
     // Compute intercept PMF
-    const interceptDice1Sides = AssaultDie.sides.map(side => side.count.intercept);
-    const interceptDice2Sides = RaidDie.sides.map(side => side.count.intercept);
-    const interceptMaxSum = Math.max(...interceptDice1Sides) * assaultDiceCount + Math.max(...interceptDice2Sides) * raidDiceCount;
-
-    const IP1 = Array(interceptMaxSum + 1).fill(0);
-    const IP2 = Array(interceptMaxSum + 1).fill(0);
-    IP1[0] = 1;
-    IP2[0] = 1;
-
-    updateProbabilities(IP1, pmf(interceptDice1Sides), assaultDiceCount);
-    updateProbabilities(IP2, pmf(interceptDice2Sides), raidDiceCount);
-
-    const interceptPMF = Array(interceptMaxSum + 1).fill(0);
-    for (let s = 0; s <= interceptMaxSum; s++) {
-      for (let x = 0; x <= s; x++) {
-        interceptPMF[s] += IP1[x] * IP2[s - x];
-      }
-    }
+    const interceptPMF = computePMF('intercept', assaultDiceCount, 0, raidDiceCount);
+    const interceptMaxSum = interceptPMF.length - 1;
 
     // Apply modifiers to intercept PMF
     if (document.getElementById('signalBreaker').checked) {
@@ -655,119 +986,11 @@ function computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount) {
     return newPMF;
   }
 
-  let dice1Sides, countDice1, dice2Sides, countDice2;
-
-  dice1Sides = AssaultDie.sides.map(side => side.count[icon]);
-  countDice1 = assaultDiceCount;
   if (icon === 'hit') {
-    dice2Sides = SkirmishDie.sides.map(side => side.count[icon]);
-    countDice2 = skirmishDiceCount;
-  } else {
-    dice2Sides = RaidDie.sides.map(side => side.count[icon]);
-    countDice2 = raidDiceCount;
-  }
-
-  // Apply intercept modifiers
-  if (icon === 'intercept') {
-    // Modifiers are now applied to the PMF after computation
-  }
-
-  const maxSum = Math.max(...dice1Sides) * countDice1 + Math.max(...dice2Sides) * countDice2;
-
-  // Adjust maxSum for mirror plating
-  let adjustedMaxSum = maxSum;
-  if (icon === 'intercept' && document.getElementById('mirrorPlating').checked) {
-    adjustedMaxSum += countDice1 + countDice2; // +1 per die
-  }
-
-  const pmf = (sides) => {
-    const counts = {};
-    const probabilities = {};
-    const totalSides = sides.length;
-    sides.forEach(side => {
-      counts[side] = (counts[side] || 0) + 1;
-    });
-    for (const [side, count] of Object.entries(counts)) {
-      probabilities[parseInt(side)] = count / totalSides;
-    }
-    return probabilities;
-  };
-
-  const P1 = Array(adjustedMaxSum + 1).fill(0);
-  const P2 = Array(adjustedMaxSum + 1).fill(0);
-  P1[0] = 1;
-  P2[0] = 1;
-
-  const updateProbabilities = (P, pmf, diceCount) => {
-    for (let i = 1; i <= diceCount; i++) {
-      const newP = Array(adjustedMaxSum + 1).fill(0);
-      for (let s = 0; s <= adjustedMaxSum; s++) {
-        for (const [side, prob] of Object.entries(pmf)) {
-          const sideNum = parseInt(side);
-          if (s >= sideNum) {
-            newP[s] += prob * P[s - sideNum];
-          }
-        }
-      }
-      for (let s = 0; s <= adjustedMaxSum; s++) {
-        P[s] = newP[s];
-      }
-    }
-  };
-
-  updateProbabilities(P1, pmf(dice1Sides), countDice1);
-  updateProbabilities(P2, pmf(dice2Sides), countDice2);
-
-  const pmfResult = Array(adjustedMaxSum + 1).fill(0);
-  for (let s = 0; s <= adjustedMaxSum; s++) {
-    for (let x = 0; x <= s; x++) {
-      pmfResult[s] += P1[x] * P2[s - x];
-    }
-  }
-
-  // Apply intercept modifiers to the final PMF
-  if (icon === 'intercept') {
-    if (document.getElementById('signalBreaker').checked) {
-      // Shift PMF down by 1 (ignore one intercept)
-      const newPMF = Array(adjustedMaxSum + 1).fill(0);
-      for (let s = 0; s <= adjustedMaxSum; s++) {
-        if (s > 0) {
-          newPMF[s - 1] += pmfResult[s];
-        } else {
-          newPMF[0] += pmfResult[0];
-        }
-      }
-      for (let s = 0; s <= adjustedMaxSum; s++) {
-        pmfResult[s] = newPMF[s];
-      }
-    }
-    if (document.getElementById('mirrorPlating').checked && countDice1 > 0) {
-      // Shift PMF up by 1 (only if assault dice are present)
-      const newPMF = Array(adjustedMaxSum + 2).fill(0);
-      for (let s = 0; s <= adjustedMaxSum; s++) {
-        newPMF[s + 1] += pmfResult[s];
-      }
-      pmfResult.length = adjustedMaxSum + 2;
-      for (let s = 0; s < pmfResult.length; s++) {
-        pmfResult[s] = newPMF[s];
-      }
-    }
-  }
-
-  return pmfResult;
-}
-
-// Compute probability of at least N for an icon
-function computeProbabilityAtLeastN(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount, desiredSum) {
-  if (icon === 'selfhit') {
-    const multiplier = parseInt(document.getElementById('interceptMultiplier').value) || 0;
-    
-    // Compute base selfhit PMF
-    const baseDice1Sides = AssaultDie.sides.map(side => side.count.selfhit);
-    const baseDice2Sides = RaidDie.sides.map(side => side.count.selfhit);
-    const baseMaxSum = Math.max(desiredSum - 1, Math.max(...baseDice1Sides) * assaultDiceCount + Math.max(...baseDice2Sides) * raidDiceCount);
-    
-    const pmf = (sides) => {
+    const skirmishRerolls = parseInt(document.getElementById('skirmishRerolls').value) || 0;
+    const assaultRerolls = parseInt(document.getElementById('assaultRerolls').value) || 0;
+    const empathVision = document.getElementById('empathVision').checked;
+    const pmfFunc = (sides) => {
       const counts = {};
       const probabilities = {};
       const totalSides = sides.length;
@@ -780,209 +1003,74 @@ function computeProbabilityAtLeastN(icon, assaultDiceCount, skirmishDiceCount, r
       return probabilities;
     };
 
-    const P1 = Array(baseMaxSum + 1).fill(0);
-    const P2 = Array(baseMaxSum + 1).fill(0);
-    P1[0] = 1;
-    P2[0] = 1;
-
-    const updateProbabilities = (P, pmf, diceCount) => {
-      for (let i = 1; i <= diceCount; i++) {
-        const newP = Array(baseMaxSum + 1).fill(0);
-        for (let s = 0; s <= baseMaxSum; s++) {
-          for (const [side, prob] of Object.entries(pmf)) {
-            const sideNum = parseInt(side);
-            if (s >= sideNum) {
-              newP[s] += prob * P[s - sideNum];
-            }
-          }
-        }
-        for (let s = 0; s <= baseMaxSum; s++) {
-          P[s] = newP[s];
-        }
-      }
-    };
-
-    updateProbabilities(P1, pmf(baseDice1Sides), assaultDiceCount);
-    updateProbabilities(P2, pmf(baseDice2Sides), raidDiceCount);
-
-    const basePMF = Array(baseMaxSum + 1).fill(0);
-    for (let s = 0; s <= baseMaxSum; s++) {
-      for (let x = 0; x <= s; x++) {
-        basePMF[s] += P1[x] * P2[s - x];
-      }
+    let resultPMF = [1];
+    if (assaultDiceCount > 0) {
+      const assaultPMF = computeAssaultPMF('hit', assaultDiceCount, assaultRerolls, selectedAssaultFaces, empathVision ? selectedAssaultEmpathFaces : new Set());
+      resultPMF = convolvePMF(resultPMF, assaultPMF);
     }
-
-    // Compute intercept PMF
-    const interceptDice1Sides = AssaultDie.sides.map(side => side.count.intercept);
-    const interceptDice2Sides = RaidDie.sides.map(side => side.count.intercept);
-    const interceptMaxSum = Math.max(...interceptDice1Sides) * assaultDiceCount + Math.max(...interceptDice2Sides) * raidDiceCount;
-
-    const IP1 = Array(interceptMaxSum + 1).fill(0);
-    const IP2 = Array(interceptMaxSum + 1).fill(0);
-    IP1[0] = 1;
-    IP2[0] = 1;
-
-    updateProbabilities(IP1, pmf(interceptDice1Sides), assaultDiceCount);
-    updateProbabilities(IP2, pmf(interceptDice2Sides), raidDiceCount);
-
-    const interceptPMF = Array(interceptMaxSum + 1).fill(0);
-    for (let s = 0; s <= interceptMaxSum; s++) {
-      for (let x = 0; x <= s; x++) {
-        interceptPMF[s] += IP1[x] * IP2[s - x];
-      }
+    if (skirmishDiceCount > 0) {
+      const skirmishPMF = computeSkirmishPMF('hit', skirmishDiceCount, skirmishRerolls, empathVision ? selectedSkirmishEmpathFaces : new Set());
+      resultPMF = convolvePMF(resultPMF, skirmishPMF);
     }
-
-    // Apply modifiers to intercept PMF
-    if (document.getElementById('signalBreaker').checked) {
-      // Approximate: reduce by 1
-      const newInterceptPMF = Array(interceptMaxSum + 1).fill(0);
-      for (let s = 0; s <= interceptMaxSum; s++) {
-        if (s > 0) {
-          newInterceptPMF[s - 1] += interceptPMF[s];
-        } else {
-          newInterceptPMF[0] += interceptPMF[0];
-        }
-      }
-      for (let s = 0; s <= interceptMaxSum; s++) {
-        interceptPMF[s] = newInterceptPMF[s];
-      }
-    }
-    if (document.getElementById('mirrorPlating').checked) {
-      // Shift by +1
-      const newInterceptPMF = Array(interceptMaxSum + 2).fill(0);
-      for (let s = 0; s <= interceptMaxSum; s++) {
-        newInterceptPMF[s + 1] += interceptPMF[s];
-      }
-      interceptPMF.length = interceptMaxSum + 2;
-      for (let s = 0; s < interceptPMF.length; s++) {
-        interceptPMF[s] = newInterceptPMF[s];
-      }
-    }
-
-    const p = 1 - (interceptPMF[0] || 0);
-    const PCombined = Array(baseMaxSum + multiplier + 1).fill(0);
-    for (let s = 0; s <= baseMaxSum; s++) {
-      PCombined[s] += basePMF[s] * (1 - p);
-      PCombined[s + multiplier] += basePMF[s] * p;
-    }
-
-    let probability = 0;
-    for (let s = desiredSum; s <= baseMaxSum + multiplier; s++) {
-      probability += PCombined[s];
-    }
-
-    if (probability < 0.0000009) {
-      probability = 0;
-    }
-
-    return probability;
+    // Raid dice don't contribute to hits
+    return resultPMF;
   }
 
-  let dice1Sides, countDice1, dice2Sides, countDice2;
-
-  dice1Sides = AssaultDie.sides.map(side => side.count[icon]);
-  countDice1 = assaultDiceCount;
-  if (icon === 'hit') {
-    dice2Sides = SkirmishDie.sides.map(side => side.count[icon]);
-    countDice2 = skirmishDiceCount;
-  } else {
-    dice2Sides = RaidDie.sides.map(side => side.count[icon]);
-    countDice2 = raidDiceCount;
+  let resultPMF = [1];
+  const assaultRerolls = parseInt(document.getElementById('assaultRerolls').value) || 0;
+  const skirmishRerolls = parseInt(document.getElementById('skirmishRerolls').value) || 0;
+  const raidRerolls = parseInt(document.getElementById('raidRerolls').value) || 0;
+  const empathVision = document.getElementById('empathVision').checked;
+  
+  if (assaultDiceCount > 0) {
+    const assaultPMF = computeAssaultPMF(icon, assaultDiceCount, assaultRerolls, selectedAssaultFaces, empathVision ? selectedAssaultEmpathFaces : new Set());
+    resultPMF = convolvePMF(resultPMF, assaultPMF);
+  }
+  if (skirmishDiceCount > 0) {
+    const skirmishPMF = computeSkirmishPMF(icon, skirmishDiceCount, skirmishRerolls, empathVision ? selectedSkirmishEmpathFaces : new Set());
+    resultPMF = convolvePMF(resultPMF, skirmishPMF);
+  }
+  if (raidDiceCount > 0) {
+    const raidPMF = computeRaidPMF(icon, raidDiceCount, raidRerolls, selectedRaidFaces, empathVision ? selectedRaidEmpathFaces : new Set());
+    resultPMF = convolvePMF(resultPMF, raidPMF);
   }
 
-  let maxSum = Math.max(desiredSum - 1, Math.max(...dice1Sides) * countDice1 + Math.max(...dice2Sides) * countDice2);
-
-  // Adjust maxSum for mirror plating
-  if (icon === 'intercept' && document.getElementById('mirrorPlating').checked) {
-    maxSum += countDice1 + countDice2;
-  }
-
-  const pmf = (sides) => {
-    const counts = {};
-    const probabilities = {};
-    const totalSides = sides.length;
-    sides.forEach(side => {
-      counts[side] = (counts[side] || 0) + 1;
-    });
-    for (const [side, count] of Object.entries(counts)) {
-      probabilities[parseInt(side)] = count / totalSides;
-    }
-    return probabilities;
-  };
-
-  const P1 = Array(maxSum + 1).fill(0);
-  const P2 = Array(maxSum + 1).fill(0);
-  P1[0] = 1;
-  P2[0] = 1;
-
-  const pmf1 = pmf(dice1Sides);
-  const pmf2 = pmf(dice2Sides);
-
-  const updateProbabilities = (P, pmf, diceCount) => {
-    for (let i = 1; i <= diceCount; i++) {
-      const newP = Array(maxSum + 1).fill(0);
-      for (let s = 0; s <= maxSum; s++) {
-        for (const [side, prob] of Object.entries(pmf)) {
-          const sideNum = parseInt(side);
-          if (s >= sideNum) {
-            newP[s] += prob * P[s - sideNum];
-          }
-        }
-      }
-      for (let s = 0; s <= maxSum; s++) {
-        P[s] = newP[s];
-      }
-    }
-  };
-
-  updateProbabilities(P1, pmf1, countDice1);
-  updateProbabilities(P2, pmf2, countDice2);
-
-  const PCombined = Array(maxSum + 1).fill(0);
-  for (let s = 0; s <= maxSum; s++) {
-    for (let x = 0; x <= s; x++) {
-      PCombined[s] += P1[x] * P2[s - x];
-    }
-  }
-
-  // Apply intercept modifiers to the PMF
+  // Apply intercept modifiers to the final PMF
   if (icon === 'intercept') {
     if (document.getElementById('signalBreaker').checked) {
-      // Shift PMF down by 1
-      const newPMF = Array(maxSum + 1).fill(0);
-      for (let s = 0; s <= maxSum; s++) {
+      // Shift PMF down by 1 (ignore one intercept)
+      const newPMF = Array(resultPMF.length).fill(0);
+      for (let s = 0; s < resultPMF.length; s++) {
         if (s > 0) {
-          newPMF[s - 1] += PCombined[s];
+          newPMF[s - 1] += resultPMF[s];
         } else {
-          newPMF[0] += PCombined[0];
+          newPMF[0] += resultPMF[0];
         }
       }
-      for (let s = 0; s <= maxSum; s++) {
-        PCombined[s] = newPMF[s];
-      }
+      resultPMF = newPMF;
     }
-    if (document.getElementById('mirrorPlating').checked) {
-      // Shift PMF up by 1
-      const newPMF = Array(maxSum + 2).fill(0);
-      for (let s = 0; s <= maxSum; s++) {
-        newPMF[s + 1] += PCombined[s];
+    if (document.getElementById('mirrorPlating').checked && assaultDiceCount > 0) {
+      // Shift PMF up by 1 (only if assault dice are present)
+      const newPMF = Array(resultPMF.length + 1).fill(0);
+      for (let s = 0; s < resultPMF.length; s++) {
+        newPMF[s + 1] += resultPMF[s];
       }
-      PCombined.length = maxSum + 2;
-      for (let s = 0; s < PCombined.length; s++) {
-        PCombined[s] = newPMF[s];
-      }
+      resultPMF = newPMF;
     }
   }
 
+  return resultPMF;
+}
+
+// Compute probability of at least N for an icon
+function computeProbabilityAtLeastN(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount, desiredSum) {
+  // Use computePMF so rerolls and modifiers are respected
+  const pmf = computePMF(icon, assaultDiceCount, skirmishDiceCount, raidDiceCount);
   let probability = 0;
-  for (let s = desiredSum; s < PCombined.length; s++) {
-    probability += PCombined[s] || 0;
+  for (let s = desiredSum; s < pmf.length; s++) {
+    probability += pmf[s] || 0;
   }
-
-  if (probability < 0.0000009) {
-    probability = 0;
-  }
-
+  if (probability < 0.0000009) probability = 0;
   return probability;
 }
 
@@ -1264,6 +1352,483 @@ rollBtn.addEventListener('click', () => {
 
 // Intercept multiplier change listener
 document.getElementById('interceptMultiplier').addEventListener('change', updateResults);
+
+// Skirmish rerolls change listener
+document.getElementById('skirmishRerolls').addEventListener('change', updateResults);
+
+// Assault rerolls change listener
+document.getElementById('assaultRerolls').addEventListener('change', updateResults);
+document.getElementById('raidRerolls').addEventListener('change', updateResults);
+
+// Empath rerolls change listener
+document.getElementById('empathVision').addEventListener('change', updateResults);
+
+// Assault reroll faces modal
+document.getElementById('assaultRerollFacesBtn').addEventListener('click', () => {
+  const modal = document.getElementById('assaultRerollModal');
+  const checkboxesDiv = document.getElementById('assaultFacesCheckboxes');
+  checkboxesDiv.innerHTML = '';
+  
+  // Create face options in priority order
+  assaultFacePriority.forEach((faceIndex) => {
+    const face = AssaultDie.sides[faceIndex];
+    const faceDiv = document.createElement('div');
+    // For linked faces 1 and 5 (faces 2 and 6), show as selected if either is selected
+    const isSelected = selectedAssaultFaces.has(faceIndex) || 
+                      (faceIndex === 1 && selectedAssaultFaces.has(5)) || 
+                      (faceIndex === 5 && selectedAssaultFaces.has(1));
+    faceDiv.className = `face-option ${isSelected ? 'selected' : ''}`;
+    faceDiv.dataset.faceIndex = faceIndex;
+    faceDiv.draggable = true;
+    
+    const img = document.createElement('img');
+    img.src = dieData.assault.faces[faceIndex].image;
+    img.alt = `Face ${faceIndex + 1}`;
+    img.style.width = '40px';
+    img.style.height = '40px';
+    img.style.marginBottom = '5px';
+    
+    const label = document.createElement('div');
+    label.className = 'face-label';
+    label.textContent = `Face ${faceIndex + 1}`;
+    
+    faceDiv.appendChild(img);
+    faceDiv.appendChild(label);
+    
+    // Click to select/deselect
+    faceDiv.addEventListener('click', (e) => {
+      if (e.target === faceDiv || e.target === img || e.target === label) {
+        const idx = parseInt(faceDiv.dataset.faceIndex);
+        
+        // Special handling for linked faces 1 and 5 (faces 2 and 6)
+        if (idx === 1 || idx === 5) {
+          const hasAny = selectedAssaultFaces.has(1) || selectedAssaultFaces.has(5);
+          if (hasAny) {
+            // Deselect both
+            selectedAssaultFaces.delete(1);
+            selectedAssaultFaces.delete(5);
+            // Update both face elements
+            document.querySelectorAll('[data-face-index="1"], [data-face-index="5"]').forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select both
+            selectedAssaultFaces.add(1);
+            selectedAssaultFaces.add(5);
+            // Update both face elements
+            document.querySelectorAll('[data-face-index="1"], [data-face-index="5"]').forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } else {
+          // Normal behavior for other faces
+          if (selectedAssaultFaces.has(idx)) {
+            selectedAssaultFaces.delete(idx);
+            faceDiv.classList.remove('selected');
+          } else {
+            selectedAssaultFaces.add(idx);
+            faceDiv.classList.add('selected');
+          }
+        }
+      }
+    });
+    
+    // Drag and drop
+    faceDiv.addEventListener('dragstart', (e) => {
+      faceDiv.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', faceIndex);
+    });
+    
+    faceDiv.addEventListener('dragend', () => {
+      faceDiv.classList.remove('dragging');
+    });
+    
+    checkboxesDiv.appendChild(faceDiv);
+  });
+  
+  // Drag over and drop on container
+  checkboxesDiv.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const dragging = document.querySelector('.face-option.dragging');
+    if (!dragging) return;
+    
+    const afterElement = getDragAfterElement(checkboxesDiv, e.clientY);
+    if (afterElement == null) {
+      checkboxesDiv.appendChild(dragging);
+    } else {
+      checkboxesDiv.insertBefore(dragging, afterElement);
+    }
+  });
+  
+  checkboxesDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    // Update priority order
+    const faceOptions = Array.from(checkboxesDiv.children);
+    assaultFacePriority = faceOptions.map(el => parseInt(el.dataset.faceIndex));
+  });
+  
+  modal.style.display = 'block';
+});
+
+function getDragAfterElement(container, y) {
+  const draggableElements = [...container.querySelectorAll('.face-option:not(.dragging)')];
+  
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+document.getElementById('assaultRerollSaveBtn').addEventListener('click', () => {
+  // Selection is already updated via clicks
+  document.getElementById('assaultRerollModal').style.display = 'none';
+  updateResults();
+});
+
+document.getElementById('assaultRerollCancelBtn').addEventListener('click', () => {
+  document.getElementById('assaultRerollModal').style.display = 'none';
+});
+
+// Raid reroll faces modal
+document.getElementById('raidRerollFacesBtn').addEventListener('click', () => {
+  const modal = document.getElementById('raidRerollModal');
+  const checkboxesDiv = document.getElementById('raidFacesCheckboxes');
+  checkboxesDiv.innerHTML = '';
+  
+  // Create face options in priority order
+  raidFacePriority.forEach((faceIndex) => {
+    const face = RaidDie.sides[faceIndex];
+    const faceDiv = document.createElement('div');
+    // For linked faces 3 and 5 (faces 4 and 6), show as selected if either is selected
+    const isSelected = selectedRaidFaces.has(faceIndex) || 
+                      (faceIndex === 3 && selectedRaidFaces.has(5)) || 
+                      (faceIndex === 5 && selectedRaidFaces.has(3));
+    faceDiv.className = `face-option ${isSelected ? 'selected' : ''}`;
+    faceDiv.dataset.faceIndex = faceIndex;
+    faceDiv.draggable = true;
+    
+    const img = document.createElement('img');
+    img.src = dieData.raid.faces[faceIndex].image;
+    img.alt = `Face ${faceIndex + 1}`;
+    img.style.width = '40px';
+    img.style.height = '40px';
+    img.style.marginBottom = '5px';
+    
+    const label = document.createElement('div');
+    label.className = 'face-label';
+    label.textContent = `Face ${faceIndex + 1}`;
+    
+    faceDiv.appendChild(img);
+    faceDiv.appendChild(label);
+    
+    // Click to select/deselect
+    faceDiv.addEventListener('click', (e) => {
+      if (e.target === faceDiv || e.target === img || e.target === label) {
+        const idx = parseInt(faceDiv.dataset.faceIndex);
+        
+        // Special handling for linked faces 3 and 5 (faces 4 and 6)
+        if (idx === 3 || idx === 5) {
+          const hasAny = selectedRaidFaces.has(3) || selectedRaidFaces.has(5);
+          if (hasAny) {
+            // Deselect both
+            selectedRaidFaces.delete(3);
+            selectedRaidFaces.delete(5);
+            // Update both face elements
+            document.querySelectorAll('[data-face-index="3"], [data-face-index="5"]').forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select both
+            selectedRaidFaces.add(3);
+            selectedRaidFaces.add(5);
+            // Update both face elements
+            document.querySelectorAll('[data-face-index="3"], [data-face-index="5"]').forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } else {
+          // Normal behavior for other faces
+          if (selectedRaidFaces.has(idx)) {
+            selectedRaidFaces.delete(idx);
+            faceDiv.classList.remove('selected');
+          } else {
+            selectedRaidFaces.add(idx);
+            faceDiv.classList.add('selected');
+          }
+        }
+        updateResults();
+      }
+    });
+    
+    // Drag and drop
+    faceDiv.addEventListener('dragstart', (e) => {
+      faceDiv.classList.add('dragging');
+      e.dataTransfer.setData('text/plain', faceIndex);
+    });
+    
+    faceDiv.addEventListener('dragend', () => {
+      faceDiv.classList.remove('dragging');
+    });
+    
+    checkboxesDiv.appendChild(faceDiv);
+  });
+  
+  // Drag over and drop on container
+  checkboxesDiv.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    const dragging = document.querySelector('.face-option.dragging');
+    if (!dragging) return;
+    
+    const afterElement = getDragAfterElement(checkboxesDiv, e.clientY);
+    if (afterElement == null) {
+      checkboxesDiv.appendChild(dragging);
+    } else {
+      checkboxesDiv.insertBefore(dragging, afterElement);
+    }
+  });
+  
+  checkboxesDiv.addEventListener('drop', (e) => {
+    e.preventDefault();
+    // Update priority order
+    const faceOptions = Array.from(checkboxesDiv.children);
+    raidFacePriority = faceOptions.map(el => parseInt(el.dataset.faceIndex));
+  });
+  
+  modal.style.display = 'block';
+});
+
+document.getElementById('raidRerollSaveBtn').addEventListener('click', () => {
+  selectedRaidFaces.clear();
+  document.querySelectorAll('#raidRerollModal .face-option.selected').forEach(el => {
+    selectedRaidFaces.add(parseInt(el.dataset.faceIndex));
+  });
+  if (selectedRaidFaces.size === 0) {
+    // Default to faces 3,4,6 if none selected
+    selectedRaidFaces.add(2);
+    selectedRaidFaces.add(3);
+    selectedRaidFaces.add(5);
+  }
+  document.getElementById('raidRerollModal').style.display = 'none';
+  updateResults();
+});
+
+document.getElementById('raidRerollCancelBtn').addEventListener('click', () => {
+  document.getElementById('raidRerollModal').style.display = 'none';
+});
+
+// Empath reroll faces modal
+document.getElementById('empathRerollFacesBtn').addEventListener('click', () => {
+  const modal = document.getElementById('empathRerollModal');
+  const checkboxesDiv = document.getElementById('empathFacesCheckboxes');
+  checkboxesDiv.innerHTML = '';
+  
+  // Create sections for each die type
+  const dieTypes = [
+    { name: 'Assault', dieData: dieData.assault },
+    { name: 'Skirmish', dieData: dieData.skirmish },
+    { name: 'Raid', dieData: dieData.raid }
+  ];
+  
+  dieTypes.forEach(dieType => {
+    const sectionDiv = document.createElement('div');
+    sectionDiv.style.marginBottom = '20px';
+    
+    const sectionTitle = document.createElement('h4');
+    sectionTitle.textContent = `${dieType.name} Dice Faces`;
+    sectionTitle.style.marginBottom = '10px';
+    sectionTitle.style.color = 'var(--text)';
+    sectionDiv.appendChild(sectionTitle);
+    
+    const facesContainer = document.createElement('div');
+    facesContainer.style.display = 'grid';
+    facesContainer.style.gridTemplateColumns = 'repeat(3, 1fr)';
+    facesContainer.style.gap = '10px';
+    facesContainer.style.marginBottom = '15px';
+    
+    // Get the appropriate selection set for this die type
+    let selectionSet;
+    if (dieType.name === 'Assault') selectionSet = selectedAssaultEmpathFaces;
+    else if (dieType.name === 'Skirmish') selectionSet = selectedSkirmishEmpathFaces;
+    else if (dieType.name === 'Raid') selectionSet = selectedRaidEmpathFaces;
+    
+    // Create face options (0-5 for all die types)
+    for (let faceIndex = 0; faceIndex < 6; faceIndex++) {
+      const faceDiv = document.createElement('div');
+      // Special handling for skirmish linked faces
+      let isSelected = selectionSet.has(faceIndex);
+      if (dieType.name === 'Skirmish' && (faceIndex === 0 || faceIndex === 1 || faceIndex === 2)) {
+        isSelected = selectionSet.has(0) || selectionSet.has(1) || selectionSet.has(2);
+      } else if (dieType.name === 'Skirmish' && (faceIndex === 3 || faceIndex === 4 || faceIndex === 5)) {
+        isSelected = selectionSet.has(3) || selectionSet.has(4) || selectionSet.has(5);
+      } else if (dieType.name === 'Assault' && (faceIndex === 1 || faceIndex === 5)) {
+        isSelected = selectionSet.has(1) || selectionSet.has(5);
+      } else if (dieType.name === 'Raid' && (faceIndex === 3 || faceIndex === 5)) {
+        isSelected = selectionSet.has(3) || selectionSet.has(5);
+      }
+      faceDiv.className = `face-option ${isSelected ? 'selected' : ''}`;
+      faceDiv.dataset.faceIndex = faceIndex;
+      faceDiv.dataset.dieType = dieType.name.toLowerCase();
+      faceDiv.style.cursor = 'pointer';
+      faceDiv.style.display = 'flex';
+      faceDiv.style.flexDirection = 'column';
+      faceDiv.style.alignItems = 'center';
+      faceDiv.style.padding = '8px';
+      faceDiv.style.borderRadius = 'var(--radius-sm)';
+      faceDiv.style.transition = 'all 0.2s';
+      
+      const img = document.createElement('img');
+      img.src = dieType.dieData.faces[faceIndex].image;
+      img.alt = `${dieType.name} Face ${faceIndex + 1}`;
+      img.style.width = '50px';
+      img.style.height = '50px';
+      img.style.marginBottom = '5px';
+      
+      faceDiv.appendChild(img);
+      
+      // Click to select/deselect
+      faceDiv.addEventListener('click', (e) => {
+        const idx = parseInt(faceDiv.dataset.faceIndex);
+        const dieTypeName = faceDiv.dataset.dieType;
+        let targetSelectionSet;
+        if (dieTypeName === 'assault') targetSelectionSet = selectedAssaultEmpathFaces;
+        else if (dieTypeName === 'skirmish') targetSelectionSet = selectedSkirmishEmpathFaces;
+        else if (dieTypeName === 'raid') targetSelectionSet = selectedRaidEmpathFaces;
+        
+        // Special handling for skirmish faces 0, 1, 2 - they are linked
+        if (dieTypeName === 'skirmish' && (idx === 0 || idx === 1 || idx === 2)) {
+          const hasAny = targetSelectionSet.has(0) || targetSelectionSet.has(1) || targetSelectionSet.has(2);
+          if (hasAny) {
+            // Deselect all three
+            targetSelectionSet.delete(0);
+            targetSelectionSet.delete(1);
+            targetSelectionSet.delete(2);
+            // Update all face elements for indices 0, 1, 2
+            document.querySelectorAll(`[data-die-type="skirmish"][data-face-index="0"],
+                                     [data-die-type="skirmish"][data-face-index="1"],
+                                     [data-die-type="skirmish"][data-face-index="2"]`).forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select all three
+            targetSelectionSet.add(0);
+            targetSelectionSet.add(1);
+            targetSelectionSet.add(2);
+            // Update all face elements for indices 0, 1, 2
+            document.querySelectorAll(`[data-die-type="skirmish"][data-face-index="0"],
+                                     [data-die-type="skirmish"][data-face-index="1"],
+                                     [data-die-type="skirmish"][data-face-index="2"]`).forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } 
+        // Special handling for assault faces 1, 5 - they are linked
+        else if (dieTypeName === 'assault' && (idx === 1 || idx === 5)) {
+          const hasAny = targetSelectionSet.has(1) || targetSelectionSet.has(5);
+          if (hasAny) {
+            // Deselect both
+            targetSelectionSet.delete(1);
+            targetSelectionSet.delete(5);
+            // Update all face elements for indices 1, 5
+            document.querySelectorAll(`[data-die-type="assault"][data-face-index="1"],
+                                     [data-die-type="assault"][data-face-index="5"]`).forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select both
+            targetSelectionSet.add(1);
+            targetSelectionSet.add(5);
+            // Update all face elements for indices 1, 5
+            document.querySelectorAll(`[data-die-type="assault"][data-face-index="1"],
+                                     [data-die-type="assault"][data-face-index="5"]`).forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } 
+        // Special handling for skirmish faces 3, 4, 5 - they are linked
+        else if (dieTypeName === 'skirmish' && (idx === 3 || idx === 4 || idx === 5)) {
+          const hasAny = targetSelectionSet.has(3) || targetSelectionSet.has(4) || targetSelectionSet.has(5);
+          if (hasAny) {
+            // Deselect all
+            targetSelectionSet.delete(3);
+            targetSelectionSet.delete(4);
+            targetSelectionSet.delete(5);
+            // Update all face elements for indices 3, 4, 5
+            document.querySelectorAll(`[data-die-type="skirmish"][data-face-index="3"],
+                                     [data-die-type="skirmish"][data-face-index="4"],
+                                     [data-die-type="skirmish"][data-face-index="5"]`).forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select all
+            targetSelectionSet.add(3);
+            targetSelectionSet.add(4);
+            targetSelectionSet.add(5);
+            // Update all face elements for indices 3, 4, 5
+            document.querySelectorAll(`[data-die-type="skirmish"][data-face-index="3"],
+                                     [data-die-type="skirmish"][data-face-index="4"],
+                                     [data-die-type="skirmish"][data-face-index="5"]`).forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } 
+        // Special handling for raid faces 3, 5 - they are linked
+        else if (dieTypeName === 'raid' && (idx === 3 || idx === 5)) {
+          const hasAny = targetSelectionSet.has(3) || targetSelectionSet.has(5);
+          if (hasAny) {
+            // Deselect both
+            targetSelectionSet.delete(3);
+            targetSelectionSet.delete(5);
+            // Update all face elements for indices 3, 5
+            document.querySelectorAll(`[data-die-type="raid"][data-face-index="3"],
+                                     [data-die-type="raid"][data-face-index="5"]`).forEach(el => {
+              el.classList.remove('selected');
+            });
+          } else {
+            // Select both
+            targetSelectionSet.add(3);
+            targetSelectionSet.add(5);
+            // Update all face elements for indices 3, 5
+            document.querySelectorAll(`[data-die-type="raid"][data-face-index="3"],
+                                     [data-die-type="raid"][data-face-index="5"]`).forEach(el => {
+              el.classList.add('selected');
+            });
+          }
+        } else {
+          // Normal behavior for other faces
+          if (targetSelectionSet.has(idx)) {
+            targetSelectionSet.delete(idx);
+            faceDiv.classList.remove('selected');
+          } else {
+            targetSelectionSet.add(idx);
+            faceDiv.classList.add('selected');
+          }
+        }
+      });
+      
+      facesContainer.appendChild(faceDiv);
+    }
+    
+    sectionDiv.appendChild(facesContainer);
+    checkboxesDiv.appendChild(sectionDiv);
+  });
+  
+  modal.style.display = 'block';
+});
+
+document.getElementById('empathRerollSaveBtn').addEventListener('click', () => {
+  // Selection is already updated via clicks
+  document.getElementById('empathRerollModal').style.display = 'none';
+  updateResults();
+});
+
+document.getElementById('empathRerollCancelBtn').addEventListener('click', () => {
+  document.getElementById('empathRerollModal').style.display = 'none';
+});
 
 // Mirror Plating and Signal Breaker change listeners
 document.getElementById('mirrorPlating').addEventListener('change', updateResults);
