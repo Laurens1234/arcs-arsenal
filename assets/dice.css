@@ -97,16 +97,15 @@
 }
 
 .btn-add {
-  background: #87ceeb;
+  background: var(--accent);
   color: white;
-  border: 2px solid #87ceeb;
+  border: none;
   padding: 10px 16px;
   border-radius: var(--radius-sm);
   font-weight: 500;
   font-size: 18px;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.18), 0 0 0 3px rgba(0,0,0,0.04);
+  transition: background 0.15s ease, transform 0.08s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -114,13 +113,12 @@
 }
 
 .btn-add:hover {
-  background: #6bb6d6;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.22), 0 0 0 4px rgba(0,0,0,0.05);
+  background: var(--accent-hover);
 }
 
 .add-roll-section .btn-add:focus {
   outline: none;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.22), 0 0 0 4px rgba(0,0,0,0.06);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.12), 0 0 0 4px var(--accent-glow);
 }
 
 .add-roll-section .btn-add:active {
@@ -855,7 +853,10 @@
 
 .modal-content {
   background-color: var(--bg-card);
-  margin: 15% auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   padding: 20px;
   border-radius: var(--radius-lg);
   width: 80%;

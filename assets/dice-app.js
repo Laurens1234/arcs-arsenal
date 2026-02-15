@@ -35,15 +35,15 @@ const RaidDie = {
 };
 
 // Selected faces for assault rerolls
-const selectedAssaultFaces = new Set([0]); // Face 1 enabled by default
+const selectedAssaultFaces = new Set([0, 1, 5]); // Faces 1, 2 and 6 enabled by default
 
 // Selected faces for raid rerolls
 const selectedRaidFaces = new Set([2, 3, 5]); // Faces 3, 4, 6 enabled by default
 
 // Selected faces for empath rerolls (separate for each die type)
-const selectedAssaultEmpathFaces = new Set([0]); // Face 1 enabled by default for assault
-const selectedSkirmishEmpathFaces = new Set([0, 1, 2]); // Faces 1, 2, 3 enabled by default for skirmish (linked)
-const selectedRaidEmpathFaces = new Set([2, 3, 5]); // Faces 3, 4, 6 enabled by default for raid (linked)
+const selectedAssaultEmpathFaces = new Set([0, 1, 5]); // Faces 1, 2, 6 enabled by default for assault
+const selectedSkirmishEmpathFaces = new Set([0]); // Faces 1, 2, 3 enabled by default for skirmish
+const selectedRaidEmpathFaces = new Set([0, 5]); // Faces 1, 2, 6 enabled by default for raid
 
 // Priority order for assault faces (0-5, higher index = lower priority)
 let assaultFacePriority = [0, 1, 5, 2, 3, 4]; // Faces 1,2,6,3,4,5
@@ -280,104 +280,99 @@ function updateResults() {
 
   // Update bell curves section
   const bellCurvesEl = document.getElementById('bellCurvesSection');
-  if (totalDice > 0) {
-    const existingMode = document.getElementById('histogramMode')?.value || 'exact';
-    const bellCurves = allIcons.map(icon => {
-      const pmf = computePMF(icon.key, assault, skirmish, raid);
-      
-      // Convert PMF based on mode
-      let displayPMF = pmf;
-      if (existingMode === 'atleast') {
-        displayPMF = pmf.map((_, i) => computeProbabilityAtLeastN(icon.key, assault, skirmish, raid, i));
-      } else if (existingMode === 'atmost') {
-        displayPMF = pmf.map((_, i) => pmf.slice(0, i + 1).reduce((sum, p) => sum + p, 0));
-      }
-      
-      // Skip leading/trailing based on mode
-      let chartPMF = displayPMF;
-      let offset = 0;
-      while (chartPMF.length > 0 && chartPMF[0] === 0) {
-        chartPMF = chartPMF.slice(1);
-        offset++;
-      }
-      // Trim trailing zeros
-      while (chartPMF.length > 0 && chartPMF[chartPMF.length - 1] === 0) {
-        chartPMF.pop();
-      }
-      
-      const maxProb = Math.max(...chartPMF);
-      
-      // Always show the chart
-      
-      // Calculate bar width based on number of bars and available space
-      const numBars = chartPMF.length;
-      const maxTotalWidth = 600; // Maximum total width for all bars in pixels
-      const minBarWidth = 30; // Minimum bar width
-      const maxBarWidth = 120; // Maximum bar width
-      
-      let barWidth;
-      if (numBars * maxBarWidth <= maxTotalWidth) {
-        // If all bars can fit at max width, use max width
-        barWidth = maxBarWidth;
-      } else if (numBars * minBarWidth <= maxTotalWidth) {
-        // If bars can fit at min width, distribute space evenly
-        barWidth = Math.floor(maxTotalWidth / numBars);
-      } else {
-        // If even min width is too much, use min width (chart will scroll)
-        barWidth = minBarWidth;
-      }
-      
-      barWidth = `${barWidth}px`;
-      
-      const chartBars = chartPMF.map((p, idx) => {
-        const i = idx + offset;
-        const height = maxProb > 0 ? (p / maxProb) * 120 : 0; // 120px max height
-        const percent = (p * 100).toFixed(1);
-        const tooltipPercent = (p * 100).toFixed(3);
-        const label = existingMode === 'atleast' ? `≥${i}` : existingMode === 'atmost' ? `≤${i}` : i;
-        return `
-          <div class="bell-curve-bar-container" style="width: ${barWidth};">
-            <div class="bell-curve-bar" style="height: ${height}px;" title="${i}: ${tooltipPercent}%"></div>
-            <div class="bell-curve-label">${label}</div>
-            <div class="bell-curve-percent">${percent}%</div>
-          </div>
-        `;
-      }).join('');
-
+  const existingMode = document.getElementById('histogramMode')?.value || 'exact';
+  const bellCurves = allIcons.map(icon => {
+    const pmf = computePMF(icon.key, assault, skirmish, raid);
+    
+    // Convert PMF based on mode
+    let displayPMF = pmf;
+    if (existingMode === 'atleast') {
+      displayPMF = pmf.map((_, i) => computeProbabilityAtLeastN(icon.key, assault, skirmish, raid, i));
+    } else if (existingMode === 'atmost') {
+      displayPMF = pmf.map((_, i) => pmf.slice(0, i + 1).reduce((sum, p) => sum + p, 0));
+    }
+    
+    // Skip leading/trailing based on mode
+    let chartPMF = displayPMF;
+    let offset = 0;
+    while (chartPMF.length > 0 && chartPMF[0] === 0) {
+      chartPMF = chartPMF.slice(1);
+      offset++;
+    }
+    // Trim trailing zeros
+    while (chartPMF.length > 0 && chartPMF[chartPMF.length - 1] === 0) {
+      chartPMF.pop();
+    }
+    
+    const maxProb = Math.max(...chartPMF);
+    
+    // Always show the chart
+    
+    // Calculate bar width based on number of bars and available space
+    const numBars = chartPMF.length;
+    const maxTotalWidth = 600; // Maximum total width for all bars in pixels
+    const minBarWidth = 30; // Minimum bar width
+    const maxBarWidth = 120; // Maximum bar width
+    
+    let barWidth;
+    if (numBars * maxBarWidth <= maxTotalWidth) {
+      // If all bars can fit at max width, use max width
+      barWidth = maxBarWidth;
+    } else if (numBars * minBarWidth <= maxTotalWidth) {
+      // If bars can fit at min width, distribute space evenly
+      barWidth = Math.floor(maxTotalWidth / numBars);
+    } else {
+      // If even min width is too much, use min width (chart will scroll)
+      barWidth = minBarWidth;
+    }
+    
+    barWidth = `${barWidth}px`;
+    
+    const chartBars = chartPMF.map((p, idx) => {
+      const i = idx + offset;
+      const height = maxProb > 0 ? (p / maxProb) * 120 : 0; // 120px max height
+      const percent = (p * 100).toFixed(1);
+      const tooltipPercent = (p * 100).toFixed(3);
+      const label = existingMode === 'atleast' ? `≥${i}` : existingMode === 'atmost' ? `≤${i}` : i;
       return `
-        <div class="bell-curve-item">
-          <div class="bell-curve-header">
-            <img src="${icon.image}" alt="${icon.name}" class="bell-curve-icon">
-            <span>${icon.name}</span>
-          </div>
-          <div class="bell-curve-chart" style="display: flex; justify-content: center;">${chartBars}</div>
+        <div class="bell-curve-bar-container" style="width: ${barWidth};">
+          <div class="bell-curve-bar" style="height: ${height}px;" title="${i}: ${tooltipPercent}%"></div>
+          <div class="bell-curve-label">${label}</div>
+          <div class="bell-curve-percent">${percent}%</div>
         </div>
       `;
     }).join('');
 
-    bellCurvesEl.innerHTML = `
-      <div class="bell-curves-header">
-        <h3 class="bell-curves-title">Probability Distributions</h3>
-        <label class="histogram-mode">
-          <span>Mode:</span>
-          <select id="histogramMode">
-            <option value="exact">Exact</option>
-            <option value="atleast">At Least</option>
-            <option value="atmost">At Most</option>
-          </select>
-        </label>
+    return `
+      <div class="bell-curve-item">
+        <div class="bell-curve-header">
+          <img src="${icon.image}" alt="${icon.name}" class="bell-curve-icon">
+          <span>${icon.name}</span>
+        </div>
+        <div class="bell-curve-chart" style="display: flex; justify-content: center;">${chartBars}</div>
       </div>
-      <div class="bell-curves-container">${bellCurves}</div>
     `;
-    // Set the mode and add listener
-    const histogramMode = document.getElementById('histogramMode');
-    histogramMode.value = existingMode;
-    histogramMode.addEventListener('change', updateResults);
-    bellCurvesEl.style.display = 'block';
-  } else {
-    bellCurvesEl.innerHTML = '';
-    bellCurvesEl.style.display = 'none';
-  }
+  }).join('');
+
+  bellCurvesEl.innerHTML = `
+    <div class="bell-curves-header">
+      <h3 class="bell-curves-title">Probability Distributions</h3>
+      <label class="histogram-mode">
+        <span>Mode:</span>
+        <select id="histogramMode">
+          <option value="exact">Exact</option>
+          <option value="atleast">At Least</option>
+          <option value="atmost">At Most</option>
+        </select>
+      </label>
+    </div>
+    <div class="bell-curves-container">${bellCurves}</div>
+  `;
+  // Set the mode and add listener
+  const histogramMode = document.getElementById('histogramMode');
+  histogramMode.value = existingMode;
+  histogramMode.addEventListener('change', updateResults);
+  bellCurvesEl.style.display = 'block';
 
   // Update custom probability calculator
   const customProbEl = document.getElementById('customProbSection');
@@ -1871,6 +1866,44 @@ document.getElementById('addDieRollBtn').addEventListener('click', () => {
   });
   
   updateResults();
+});
+
+// Card enlargement modal
+function showEnlargedCard(imageSrc, cardName) {
+  document.getElementById('cardModalImage').src = imageSrc;
+  document.getElementById('cardModalImage').alt = cardName;
+  document.getElementById('cardModalTitle').textContent = cardName;
+  document.getElementById('cardModal').style.display = 'block';
+}
+
+// Make function globally available
+window.showEnlargedCard = showEnlargedCard;
+
+document.getElementById('cardModalClose').addEventListener('click', () => {
+  document.getElementById('cardModal').style.display = 'none';
+});
+
+// Close card modal when clicking outside
+document.getElementById('cardModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('cardModal')) {
+    document.getElementById('cardModal').style.display = 'none';
+  }
+});
+
+// Help modal
+document.getElementById('helpBtn').addEventListener('click', () => {
+  document.getElementById('helpModal').style.display = 'block';
+});
+
+document.getElementById('helpCloseBtn').addEventListener('click', () => {
+  document.getElementById('helpModal').style.display = 'none';
+});
+
+// Close modal when clicking outside
+document.getElementById('helpModal').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('helpModal')) {
+    document.getElementById('helpModal').style.display = 'none';
+  }
 });
 
 statusEl.style.display = 'none';
