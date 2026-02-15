@@ -1438,6 +1438,44 @@ document.getElementById('assaultRerollFacesBtn').addEventListener('click', () =>
       faceDiv.classList.remove('dragging');
     });
     
+    // Touch drag support for mobile
+    let touchStartY = 0;
+    let isDragging = false;
+    
+    faceDiv.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+      isDragging = false;
+      faceDiv.classList.add('dragging');
+    });
+    
+    faceDiv.addEventListener('touchmove', (e) => {
+      if (!isDragging) {
+        const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+        if (deltaY > 10) { // Start dragging after 10px movement
+          isDragging = true;
+        }
+      }
+      if (isDragging) {
+        e.preventDefault();
+        const y = e.touches[0].clientY;
+        const afterElement = getDragAfterElement(checkboxesDiv, y);
+        if (afterElement == null) {
+          checkboxesDiv.appendChild(faceDiv);
+        } else {
+          checkboxesDiv.insertBefore(faceDiv, afterElement);
+        }
+      }
+    });
+    
+    faceDiv.addEventListener('touchend', () => {
+      faceDiv.classList.remove('dragging');
+      if (isDragging) {
+        // Update priority order
+        const faceOptions = Array.from(checkboxesDiv.children);
+        assaultFacePriority = faceOptions.map(el => parseInt(el.dataset.faceIndex));
+      }
+    });
+    
     checkboxesDiv.appendChild(faceDiv);
   });
   
@@ -1447,7 +1485,8 @@ document.getElementById('assaultRerollFacesBtn').addEventListener('click', () =>
     const dragging = document.querySelector('.face-option.dragging');
     if (!dragging) return;
     
-    const afterElement = getDragAfterElement(checkboxesDiv, e.clientY);
+    const y = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    const afterElement = getDragAfterElement(checkboxesDiv, y);
     if (afterElement == null) {
       checkboxesDiv.appendChild(dragging);
     } else {
@@ -1570,6 +1609,44 @@ document.getElementById('raidRerollFacesBtn').addEventListener('click', () => {
       faceDiv.classList.remove('dragging');
     });
     
+    // Touch drag support for mobile
+    let touchStartY = 0;
+    let isDragging = false;
+    
+    faceDiv.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+      isDragging = false;
+      faceDiv.classList.add('dragging');
+    });
+    
+    faceDiv.addEventListener('touchmove', (e) => {
+      if (!isDragging) {
+        const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
+        if (deltaY > 10) { // Start dragging after 10px movement
+          isDragging = true;
+        }
+      }
+      if (isDragging) {
+        e.preventDefault();
+        const y = e.touches[0].clientY;
+        const afterElement = getDragAfterElement(checkboxesDiv, y);
+        if (afterElement == null) {
+          checkboxesDiv.appendChild(faceDiv);
+        } else {
+          checkboxesDiv.insertBefore(faceDiv, afterElement);
+        }
+      }
+    });
+    
+    faceDiv.addEventListener('touchend', () => {
+      faceDiv.classList.remove('dragging');
+      if (isDragging) {
+        // Update priority order
+        const faceOptions = Array.from(checkboxesDiv.children);
+        raidFacePriority = faceOptions.map(el => parseInt(el.dataset.faceIndex));
+      }
+    });
+    
     checkboxesDiv.appendChild(faceDiv);
   });
   
@@ -1579,7 +1656,8 @@ document.getElementById('raidRerollFacesBtn').addEventListener('click', () => {
     const dragging = document.querySelector('.face-option.dragging');
     if (!dragging) return;
     
-    const afterElement = getDragAfterElement(checkboxesDiv, e.clientY);
+    const y = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    const afterElement = getDragAfterElement(checkboxesDiv, y);
     if (afterElement == null) {
       checkboxesDiv.appendChild(dragging);
     } else {
