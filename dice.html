@@ -97,7 +97,6 @@
 
         <!-- ===== PROBABILITY CALCULATOR ===== -->
         <div class="dice-calculator">
-          <h2 class="dice-section-title">Arcs Dice</h2>
           <div class="calculator-layout">
             <div class="dice-sections">
               <div class="dice-inputs">
@@ -121,65 +120,69 @@
             <div id="customProbSection"></div>
           </div>
           <div id="result" class="calc-result"></div>
-          <div class="intercept-config" style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px;">
-            <label for="skirmishRerolls">Skirmisher rerolls:</label>
-            <select id="skirmishRerolls" class="header-select">
-              <option value="0" selected>0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-            <label for="assaultRerolls">Seeker Torpedoes rerolls:</label>
-            <select id="assaultRerolls" class="header-select">
-              <option value="0" selected>0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-            <button id="assaultRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Seeker Faces</button>
-            <label for="raidRerolls">Corsair rerolls:</label>
-            <select id="raidRerolls" class="header-select">
-              <option value="0" selected>0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-            </select>
-            <button id="raidRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Corsair Faces</button>
-            <label style="font-size: 0.9em;"><input type="checkbox" id="empathVision"> Empath's Vision</label>
-            <button id="empathRerollFacesBtn" style="padding: 6px 12px; background: var(--bg-solid); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; color: var(--text); font-size: 0.9rem;">Select Empath Faces</button>
-            <label for="interceptMultiplier">Self-hits if Intercepted:</label>
-            <select id="interceptMultiplier" class="header-select">
-              <option value="0" selected>0</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-              <option value="11">11</option>
-              <option value="12">12</option>
-              <option value="13">13</option>
-              <option value="14">14</option>
-              <option value="15">15</option>
-            </select>
-            <div class="intercept-options" style="display: flex; flex-direction: column; gap: 5px;">
-              <label style="font-size: 0.9em;"><input type="checkbox" id="mirrorPlating"> Mirror Plating (+1 intercept, requires assault dice)</label>
-              <label style="font-size: 0.9em;"><input type="checkbox" id="signalBreaker"> Signal Breaker (ignore 1 rolled intercept)</label>
+          <div class="intercept-config" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+            <div class="intercept-row" style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <label for="skirmishRerolls">Skirmishers rerolls:</label>
+              <select id="skirmishRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <label for="assaultRerolls">Seeker Torpedoes rerolls:</label>
+              <select id="assaultRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <button id="assaultRerollFacesBtn" style="padding: 6px 12px; background: #83271c; border: 1px solid #83271c; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Seeker Faces</button>
+              <label for="raidRerolls">Corsair rerolls:</label>
+              <select id="raidRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <button id="raidRerollFacesBtn" style="padding: 6px 12px; background: #d07430; border: 1px solid #d07430; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Corsair Faces</button>
             </div>
-          </div>
+            <div class="intercept-row" style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <label style="font-size: 0.9em;"><input type="checkbox" id="empathVision"> Empath's Vision rerolls:</label>
+              <button id="empathRerollFacesBtn" style="padding: 6px 12px; background: #7c3aed; border: 1px solid #7c3aed; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Empath Faces</button>
+              <label for="interceptMultiplier">Self-hits if Intercepted:</label>
+              <select id="interceptMultiplier" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+                <option value="13">13</option>
+                <option value="14">14</option>
+                <option value="15">15</option>
+              </select>
+              <div class="intercept-options" style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.9em;"><input type="checkbox" id="mirrorPlating"> Mirror Plating (+1 intercept, requires assault dice)</label>
+                <label style="font-size: 0.9em;"><input type="checkbox" id="signalBreaker"> Signal Breaker (ignore 1 rolled intercept)</label>
+              </div>
+              <button id="helpBtn" class="btn-roll" style="padding: 6px 12px; font-size: 0.9rem; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">?</button>
+            </div>
           <div class="roll-section">
             <button id="rollDiceBtn" class="btn-roll">🎲 Roll Dice</button>
           </div>
@@ -217,6 +220,36 @@
           <button id="empathRerollSaveBtn" class="btn-modal-primary">Save</button>
           <button id="empathRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+      <div class="modal-content" style="max-width: 900px;">
+        <h3>Dice Calculator Settings Help</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 20px; justify-items: center;">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L14.png" alt="Seeker Torpedoes" style="width: 150px; height: auto; border-radius: 8px; cursor: pointer;" title="Seeker Torpedoes" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L14.png', 'Seeker Torpedoes')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/LEAD11.png" alt="Corsair" style="width: 150px; height: auto; border-radius: 8px; cursor: pointer;" title="Corsair" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/LEAD11.png', 'Corsair')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L19.png" alt="Empath's Vision" style="width: 150px; height: auto; border-radius: 8px; cursor: pointer;" title="Empath's Vision" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L19.png', 'Empath\'s Vision')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L04.png" alt="Mirror Plating" style="width: 150px; height: auto; border-radius: 8px; cursor: pointer;" title="Mirror Plating" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L04.png', 'Mirror Plating')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L06.png" alt="Signal Breaker" style="width: 150px; height: auto; border-radius: 8px; cursor: pointer;" title="Signal Breaker" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L06.png', 'Signal Breaker')">
+          
+        </div>
+        <div style="margin-top: 20px; text-align: center;">
+          <button id="helpCloseBtn" class="btn-modal-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cardModal" class="modal">
+      <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <span id="cardModalClose" style="position: absolute; top: 10px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa;">&times;</span>
+        <h3 id="cardModalTitle"></h3>
+        <img id="cardModalImage" src="" alt="" style="width: 100%; max-width: 400px; height: auto; border-radius: 8px; margin: 20px 0;">
       </div>
     </div>
 
