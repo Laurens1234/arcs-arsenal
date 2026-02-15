@@ -46,7 +46,6 @@ const el = {
   loreHistogram: document.getElementById("loreHistogram"),
   loreAnalysis: document.getElementById("loreAnalysis"),
   loreTierList: document.getElementById("loreTierList"),
-  totalGames: document.getElementById("totalGames"),
   // Histogram titles/subtitles/help buttons
   leaderHistogramTitle: document.getElementById("leaderHistogramTitle"),
   leaderHistogramSubtitle: document.getElementById("leaderHistogramSubtitle"),
@@ -73,7 +72,7 @@ let appState = {
   compareCards: [null, null],
   insights: null,
   dataSource: "league",      // "league" | "Community"
-  playerCount: "4p",         // "3p" | "4p" (for Community)
+  playerCount: "3p",         // "3p" | "4p" (for Community)
   yamlCards: [],              // loaded card definitions
   leagueCards: null,          // { leaders, lore } from league data
   currentModalCard: null,     // current card in modal
@@ -375,7 +374,7 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   svg += `<line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${padding.top + chartH}" stroke="currentColor" stroke-opacity="0.3"/>`;
   
   // Axis labels
-  const xLabel = isCommunity ? "Draft Rank (← later | earlier →)" : "Times Picked";
+  const xLabel = isCommunity ? "Draft Rank " : "Times Picked";
   svg += `<text x="${width / 2}" y="${height - 5}" text-anchor="middle" class="axis-label">${xLabel}</text>`;
   svg += `<text x="12" y="${height / 2}" text-anchor="middle" transform="rotate(-90, 12, ${height / 2})" class="axis-label">Win Rate %</text>`;
   
@@ -804,9 +803,6 @@ function renderInsights(leaders, lore, gamesOverride, metric) {
   renderHistogram(lore, el.loreHistogram, "lore", metric);
   renderCardAnalysis(lore, el.loreAnalysis);
   renderTierList(lore, el.loreTierList);
-  
-  // Update footer with total games
-  el.totalGames.textContent = insights.estimatedGames.toLocaleString();
 }
 
 function refreshHistograms(metric) {
@@ -1181,8 +1177,10 @@ function switchDataSource(source, playerCount) {
     leaders = appState.leagueCards.leaders;
     lore = appState.leagueCards.lore;
     games = null; // will be estimated by calculateInsights
+    const totalPicks = leaders.reduce((sum, c) => sum + (c.stats?.timesPicked ?? 0), 0);
+    const estimatedGames = Math.round(totalPicks / 4);
     if (el.dataSourceLabel) {
-      el.dataSourceLabel.innerHTML = 'Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a>';
+      el.dataSourceLabel.innerHTML = `Data from <a href="https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345" target="_blank">Arcs League Tracker</a> (${estimatedGames} games)`;
     }
     if (el.pageTagline) {
       el.pageTagline.textContent = "Leaders & Lore win rates from Arcs League games";
@@ -1199,7 +1197,7 @@ function switchDataSource(source, playerCount) {
     lore = communityCards.filter((c) => c.stats.type === "Lore");
     if (el.dataSourceLabel) {
       const label = appState.playerCount === "3p" ? "3-player" : "4-player";
-      el.dataSourceLabel.innerHTML = `Community ${label} data from <a href="https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates" target="_blank">BGG</a>`;
+      el.dataSourceLabel.innerHTML = `Community ${label} data (${games} games) from <a href="https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates" target="_blank">BGG</a>`;
     }
     if (el.pageTagline) {
       const label = appState.playerCount === "3p" ? "3-player" : "4-player";
