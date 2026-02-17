@@ -2,6 +2,10 @@
 
 Tools and data for the board game [Arcs](https://ledergames.com/products/arcs).
 
+## Live Site
+
+https://laurens1234.github.io/arcs-arsenal/
+
 ## Features
 
 - **Card Rankings** Win rates, picks, and stats for Leaders and Lore cards with interactive charts and analysis
@@ -41,6 +45,9 @@ Add strategy guides to site:
 - Strategy guide for fundamentals
 - Leader specific
 
-## Live Site
+## Threads
+- [BGG](https://boardgamegeek.com/thread/3663140/arcs-arsenal-a-website-with-card-analytics-draft-s)
+- [Discord](https://discord.com/channels/1459242411325919317/1469409321065517136)
+- [Reddit](https://www.reddit.com/r/Arcs/s/HafAWvz59C)
 
-https://laurens1234.github.io/arcs-arsenal/
+
