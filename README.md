@@ -31,7 +31,7 @@ Draft helper & Generator:
 - add synnergies, anti-synnergies, counters modifiers
 - add in modifiers for starting locations (maybe)
 - add in modifiers for starting locations based on leader with starting buildings locations (maybe)
-- Dynamically generate map setup visualization based on leader and setup card on bottom of the generator page (maybe seperate?)
+- Dynamically generate map setup visualization based on leader and setup card on bottom of the generator page
 - Make leader and draft card be swappable for the map visualization
 
 Advanced action card tracker:
