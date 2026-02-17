@@ -342,7 +342,7 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   // X-axis: rank position (inverted so rank 1 is rightmost) for Community, times picked for league
   const xValues = cards.map(c => isCommunity ? (c.stats?.rankPosition ?? 0) : (c.stats?.timesPicked ?? 0));
   const maxX = Math.max(...xValues);
-  const minX = isCommunity ? 1 : 0;
+  const minX = isCommunity ? 1 : Math.min(...xValues);
   const maxWR = Math.max(...cards.map(c => c.stats?.winRate ?? 0));
   const minWR = Math.min(...cards.map(c => c.stats?.winRate ?? 0));
   
@@ -353,9 +353,11 @@ function renderScatterChart(cards, container, dotClass = "leader") {
   const chartH = height - padding.top - padding.bottom;
   
   // Scale functions - for Community, invert X so rank 1 is on the right
+  // For league (non-community), map minX to left and maxX to right so axis starts at leftmost dot
+  const spanX = (maxX - minX) || 1;
   const xScale = isCommunity
-    ? (rank) => padding.left + ((maxX - rank) / (maxX - minX)) * chartW
-    : (picks) => padding.left + (picks / (maxX || 1)) * chartW;
+    ? (rank) => padding.left + ((maxX - rank) / (maxX - minX || 1)) * chartW
+    : (picks) => padding.left + ((picks - minX) / spanX) * chartW;
   const yScale = (wr) => padding.top + chartH - ((wr - minWR) / ((maxWR - minWR) || 1)) * chartH;
   
   // Create SVG
