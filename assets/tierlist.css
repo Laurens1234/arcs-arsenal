@@ -307,6 +307,47 @@
   }
 }
 
+/* Make tab bar more compact on small screens to avoid covering content */
+@media (max-width: 480px) {
+  .nav {
+    padding: 8px 0;
+    /* Make nav flow with the page on small screens (not sticky) */
+    position: static;
+    top: auto;
+    z-index: 1;
+    backdrop-filter: none;
+  }
+
+  .tabs {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .main-tabs, .sub-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+  }
+
+  .tab, .sub-tab {
+    padding: 6px 10px;
+    font-size: 0.85rem;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  .btn-compare {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+}
+
 /* ===== Edit Mode ===== */
 .edit-mode .personal-tier-card {
   cursor: grab;

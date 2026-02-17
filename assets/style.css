@@ -221,11 +221,12 @@ body {
 
 /* Navigation */
 .nav {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  /* Make navigation flow with the page (not sticky) so it doesn't cover content */
+  position: static;
+  top: auto;
+  z-index: 1;
   background: rgba(10, 14, 26, 0.85);
-  backdrop-filter: blur(20px);
+  backdrop-filter: none;
   border-bottom: 1px solid var(--border);
   padding: 16px 0;
 }
