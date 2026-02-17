@@ -14,8 +14,32 @@ Tools and data for the board game [Arcs](https://ledergames.com/products/arcs).
 ## Data Sources
 
 - Stats from [Arcs League Tracker](https://docs.google.com/spreadsheets/d/13Wb-JoX7L2-o3Q-ejvepsx11MW--yhTN5oJ-I4Hp2DU/edit?gid=1136087345)
-- Community data from BoardGameGeek
+- Community data from [BoardGameGeek](https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates)
 - Card images from [buriedgiantstudios/cards](https://github.com/buriedgiantstudios/cards)
+
+## Todo/ideas
+
+Dice Calculator:
+- Conditional calculation for multiple consecutive rolls, where additional rolls only happen when e.g. not too much buulding damage.
+- Finder for best dice pools over single/multiple rolls based on goal (maybe)
+
+Draft helper & Generator:
+- add synnergies, anti-synnergies, counters modifiers
+- add in modifiers for starting locations (maybe)
+- add in modifiers for starting locations based on leader with starting buildings locations (maybe(
+- Dynamically generate map setup visualization based on leader and setup card on bottom of the generator page (maybe seperate?)
+- Make leader and draft card be swappable for the map visualization
+
+Advanced action card tracker:
+- tracker which elimination options in an algorithmic way from peoples hands based on what card they've played.
+- have these cards be in likelyhood 1-5
+
+Card draw odds calculator:
+- For at least one 3 or aggresion etc.
+
+Add strategy guides to site:
+- Strategy guide for fundamentals
+- Leader specific
 
 ## Live Site
 
