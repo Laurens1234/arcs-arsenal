@@ -551,6 +551,25 @@
   border-color: var(--border-dim);
 }
 
+/* Make pool action buttons (Random / Clear) more visible and consistent */
+.pool-actions .btn-sm {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.pool-actions .btn-sm:hover {
+  transform: translateY(-2px);
+  background: var(--accent-hover);
+  box-shadow: 0 8px 20px var(--accent-glow);
+}
+
+.pool-actions .btn-sm:active {
+  transform: scale(0.98);
+}
+
 .btn-primary {
   padding: 12px 32px;
   border: none;
@@ -572,6 +591,64 @@
 .btn-primary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Help button next to Auto Draft */
+.btn-help {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+/* Simple modal for explaining best-pick algorithm */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  z-index: 1200;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  width: min(720px, 92%);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+.modal-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.modal-body {
+  margin-top:12px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.btn-close {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
 }
 
 .setup-actions {
@@ -605,6 +682,7 @@
   display: flex;
   gap: 8px;
 }
+
 
 /* Player Boards */
 .player-boards {

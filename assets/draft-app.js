@@ -581,6 +581,9 @@ function initSetupUI() {
   el.leaderWeight.addEventListener("input", () => {
     draft.leaderWeight = parseFloat(el.leaderWeight.value);
     el.weightDisplay.textContent = `${draft.leaderWeight}×`;
+    // Update displayed scores that depend on leader weight
+    renderPoolCards();
+    renderAvailableCards();
   });
 
   // Score range inputs
@@ -1469,13 +1472,41 @@ function getBestPick(playerIdx) {
           const replacementLoreIdx = Math.min(competitorsForLore, picksBeforeMyNextLore);
           const replacementLore = sortedLoreNo[replacementLoreIdx];
           const replacementLoreVal = replacementLore ? effectiveLoreValueNoGuarantee(replacementLore) : 0;
-          const nets = matchingLores.map(l => {
+          // Opponents will likely take the highest-value matching lores first;
+          // the guaranteed partner we can expect is the lowest-valued matching
+          // lore that remains. Use the minimal partner value when computing
+          // the guaranteed net benefit (worst-case remaining partner).
+          const partnerVals = matchingLores.map(l => {
             const s = SYNERGIES.find(x => x.leader === card.name && x.lore === l.name);
             const bonus = typeof s.bonus === 'function' ? s.bonus(draft.numPlayers) : s.bonus;
-            const partnerVal = getWeightedScore(l, "lore") + bonus;
-            return partnerVal - replacementLoreVal;
+            return getWeightedScore(l, "lore") + bonus;
           });
-          guaranteedBonus = Math.max(0, ...nets);
+          const worstPartnerVal = partnerVals.length ? Math.min(...partnerVals) : 0;
+          const picks = Math.min(competitorsForLore, picksBeforeMyNextLore);
+
+          // Scenario 1: opponents take matching lores first (worst for us).
+          // They remove up to `picks` highest matching lores; our partner will
+          // be the next matching lore (index = picks) if available, otherwise
+          // the top non-matching lore remaining.
+          const matchingSortedDesc = matchingLores.slice().sort((a,b)=> (getWeightedScore(b,"lore") - getWeightedScore(a,"lore")) );
+          let partnerIfMatchingTaken = null;
+          if (picks < matchingSortedDesc.length) {
+            partnerIfMatchingTaken = matchingSortedDesc[picks];
+          } else {
+            const matchingNamesSet = new Set(matchingLores.map(m => m.name));
+            partnerIfMatchingTaken = sortedLoreNo.find(l => !matchingNamesSet.has(l.name)) || null;
+          }
+          const partnerIfMatchingTakenVal = partnerIfMatchingTaken ? (getWeightedScore(partnerIfMatchingTaken, "lore") + ( (SYNERGIES.find(s=>s.leader===card.name && s.lore===partnerIfMatchingTaken.name) || {bonus:0}).bonus || 0 )) : 0;
+          const netIfMatchingTaken = partnerIfMatchingTakenVal - replacementLoreVal;
+
+          // Scenario 2: opponents ignore matching lores and take other high lores first
+          // (best-case for our combo). We would then get the best matching lore.
+          const bestMatching = matchingLores.slice().sort((a,b)=> (getWeightedScore(b,"lore") - getWeightedScore(a,"lore")) )[0] || null;
+          const bestMatchingVal = bestMatching ? (getWeightedScore(bestMatching, "lore") + ( (SYNERGIES.find(s=>s.leader===card.name && s.lore===bestMatching.name) || {bonus:0}).bonus || 0 )) : 0;
+          const netIfOppAvoidsMatching = bestMatchingVal - replacementLoreVal;
+
+          // Take the best net among scenarios, but not less than zero
+          guaranteedBonus = Math.max(0, Math.max(netIfMatchingTaken, netIfOppAvoidsMatching, worstPartnerVal - replacementLoreVal));
         }
         opportunityCost = oc_noBoost + guaranteedBonus;
       } else {
@@ -1531,13 +1562,36 @@ function getBestPick(playerIdx) {
           const replacementLeaderIdx = Math.min(competitorsForLeader, picksBeforeMyNextLeader);
           const replacementLeader = sortedLeadersNo[replacementLeaderIdx];
           const replacementLeaderVal = replacementLeader ? effectiveLeaderValueNoGuarantee(replacementLeader) : 0;
-          const nets = matchingLeadersEarly.map(l => {
+          // Opponents will likely take the best matching leaders first; the
+          // guaranteed leader we can expect is the lowest-valued matching
+          // leader that remains. Use the minimal leader value for worst-case
+          // guaranteed net benefit.
+          const leaderVals = matchingLeadersEarly.map(l => {
             const s = SYNERGIES.find(x => x.lore === card.name && x.leader === l.name);
             const bonus = typeof s.bonus === 'function' ? s.bonus(draft.numPlayers) : s.bonus;
-            const leaderVal = getWeightedScore(l, "leader") + bonus;
-            return leaderVal - replacementLeaderVal;
+            return getWeightedScore(l, "leader") + bonus;
           });
-          guaranteedBonus = Math.max(0, ...nets);
+          const worstLeaderVal = leaderVals.length ? Math.min(...leaderVals) : 0;
+          const picksL = Math.min(competitorsForLeader, picksBeforeMyNextLeader);
+
+          // Scenario 1: opponents take matching leaders first.
+          const matchingLeadersDesc = matchingLeadersEarly.slice().sort((a,b)=>(getWeightedScore(b,"leader")-getWeightedScore(a,"leader")));
+          let partnerLeaderIfMatchingTaken = null;
+          if (picksL < matchingLeadersDesc.length) {
+            partnerLeaderIfMatchingTaken = matchingLeadersDesc[picksL];
+          } else {
+            const matchingLeaderNamesSet = new Set(matchingLeadersEarly.map(m => m.name));
+            partnerLeaderIfMatchingTaken = sortedLeadersNo.find(l => !matchingLeaderNamesSet.has(l.name)) || null;
+          }
+          const partnerLeaderIfMatchingTakenVal = partnerLeaderIfMatchingTaken ? (getWeightedScore(partnerLeaderIfMatchingTaken, "leader") + ((SYNERGIES.find(s=>s.lore===card.name && s.leader===partnerLeaderIfMatchingTaken.name) || {bonus:0}).bonus || 0)) : 0;
+          const netIfMatchingTakenL = partnerLeaderIfMatchingTakenVal - replacementLeaderVal;
+
+          // Scenario 2: opponents avoid matching leaders and we get the best matching leader
+          const bestMatchingLeader = matchingLeadersEarly.slice().sort((a,b)=>(getWeightedScore(b,"leader")-getWeightedScore(a,"leader")))[0] || null;
+          const bestMatchingLeaderVal = bestMatchingLeader ? (getWeightedScore(bestMatchingLeader, "leader") + ((SYNERGIES.find(s=>s.lore===card.name && s.leader===bestMatchingLeader.name) || {bonus:0}).bonus || 0)) : 0;
+          const netIfOppAvoidsMatchingL = bestMatchingLeaderVal - replacementLeaderVal;
+
+          guaranteedBonus = Math.max(0, Math.max(netIfMatchingTakenL, netIfOppAvoidsMatchingL, worstLeaderVal - replacementLeaderVal));
         }
         opportunityCost = oc_noBoost + guaranteedBonus;
       } else {
@@ -2145,6 +2199,29 @@ async function init() {
     window.location.href = window.location.href;
   });
   el.autoDraftBtn.addEventListener("click", autoDraft);
+  // Best-pick help modal
+  el.bestPickHelp = document.getElementById("bestPickHelp");
+  el.bestPickModal = document.getElementById("bestPickModal");
+  el.bestPickClose = document.getElementById("bestPickClose");
+  if (el.bestPickHelp) el.bestPickHelp.addEventListener("click", () => {
+    if (el.bestPickModal) {
+      el.bestPickModal.classList.remove("hidden");
+      el.bestPickModal.setAttribute('aria-hidden', 'false');
+    }
+  });
+  if (el.bestPickClose) el.bestPickClose.addEventListener("click", () => {
+    if (el.bestPickModal) {
+      el.bestPickModal.classList.add("hidden");
+      el.bestPickModal.setAttribute('aria-hidden', 'true');
+    }
+  });
+  // Close modal on overlay click
+  if (el.bestPickModal) el.bestPickModal.addEventListener('click', (ev) => {
+    if (ev.target === el.bestPickModal) {
+      el.bestPickModal.classList.add('hidden');
+      el.bestPickModal.setAttribute('aria-hidden', 'true');
+    }
+  });
   el.undoBtn.addEventListener("click", undoPick);
   el.saveDraftImg.addEventListener("click", saveDraftAsImage);
 
