@@ -227,6 +227,7 @@
                 <button class="btn-option" data-value="same">Same</button>
               </div>
             </div>
+            <!-- Best Pick Algorithm (moved to top-bar controls) -->
             <!-- Leader Weight -->
             <div class="setup-group">
               <label class="setup-label">Leader Weight <span id="weightDisplay" class="weight-display">3×</span></label>
@@ -243,6 +244,22 @@
                 <option value="5"></option>
               </datalist>
               <div class="range-labels"><span>1×</span><span>2×</span><span>3×</span><span>4×</span><span>5×</span></div>
+            </div>
+            <!-- Best Pick Algorithm (moved back here) -->
+            <div class="setup-group">
+              <label class="setup-label">Best Pick Algorithm</label>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="btn-group" id="bestPickAlgoGroup">
+                  <button class="btn-option active" data-value="opportunity">Algorithmic</button>
+                  <button class="btn-option" data-value="simulation">Simulation</button>
+                </div>
+                <button id="bestPickHelp" class="btn-sm btn-help" title="How Best Pick works">?</button>
+                <div id="simulationControls" style="display:none;align-items:center;gap:8px;margin-left:8px">
+                  <input id="simulationSims" title="Higher = more accurate but slower" type="range" class="setup-range" min="10" max="500" step="10" value="30" />
+                  <span id="simulationSimsDisplay" class="range-display">30</span>
+                  <span class="sim-note" style="font-size:0.8rem;color:var(--text-muted);margin-left:6px">Higher = more accurate, slower</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -331,11 +348,12 @@
           <div class="draft-top-bar">
             <div id="draftPhaseLabel" class="draft-phase">Draft</div>
             <div class="draft-actions">
-              <button id="saveDraftImg" class="btn-sm" style="display:none">📷 Save Image</button>
+              <div id="saveDraftActions" style="display:flex;align-items:center;margin-right:8px;gap:8px">
+                <button id="saveDraftImg" class="btn-sm" style="display:none">📷 Save Image</button>
+              </div>
               <button id="autoDraftBtn" class="btn-sm">Auto Draft</button>
               <button id="undoBtn" class="btn-sm" disabled>Undo</button>
               <button id="resetDraft" class="btn-sm btn-danger">Reset</button>
-              <button id="bestPickHelp" class="btn-sm btn-help" title="How Best Pick works">?</button>
             </div>
           </div>
 
@@ -378,7 +396,8 @@
         <li><strong>Guaranteed-partner logic:</strong> when multiple matching partners exist, the algorithm simulates opponent behavior (taking matching partners first or not) and computes the net benefit of securing a combo versus the expected replacement if you wait.</li>
         <li><strong>Blocking simulation:</strong> the algorithm considers opponents blocking your combo and compares outcomes across scenarios to decide if pursuing the combo is worth it.</li>
       </ul>
-      <p>In short: it chooses the pick that maximizes your net advantage after accounting for realistic replacements and potential synergies or blocks.</p>
+      <p><strong>Opportunity-Cost</strong>: The default algorithm computes an "opportunity cost" for each pick — the value difference between taking the card now and the realistic replacement you are likely to get later. It accounts for immediate synergies with cards you already own and models how opponents might block your combos.</p>
+      <p><strong>Simulation (how it works)</strong>: When you select the <em>Simulation</em> algorithm, the tool tests each candidate pick by simulating complete drafts multiple times. For each candidate it applies that pick to your board, then simulates the remaining draft where other players choose picks to maximize their own final score (via short rollouts). Each simulation produces your final score; the algorithm averages those scores across simulations and recommends the pick with the highest expected final score. Increasing the simulation count makes recommendations more stable but increases runtime.</p>
     </div>
   </div>
 </div>

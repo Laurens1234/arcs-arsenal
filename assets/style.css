@@ -1504,6 +1504,14 @@ body {
   max-width: 320px;
 }
 
+/* Force the best-pick help modal to a single-column layout for readability */
+#bestPickModal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+}
+
 .modal-image img {
   width: 100%;
   height: auto;
