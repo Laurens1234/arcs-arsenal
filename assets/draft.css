@@ -227,6 +227,12 @@
   accent-color: var(--accent);
 }
 
+/* Make the simulation slider visually larger and usable when placed inline */
+#simulationSims {
+  min-width: 180px;
+  width: 180px;
+}
+
 .range-labels {
   display: flex;
   justify-content: space-between;
