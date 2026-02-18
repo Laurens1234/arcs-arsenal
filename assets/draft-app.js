@@ -1411,6 +1411,32 @@ function getBestPick(playerIdx) {
       }
       const leadersTakenBefore = Math.min(competitorsForLeader, picksBeforeMyNextLeader);
       const replacementIdx = leadersTakenBefore;
+      // If this leader would complete a synergy and opponents could take it before
+      // my next leader pick, guarantee it by forcing a very high opportunity cost
+      if (!player.leader) {
+        for (const synergy of SYNERGIES) {
+          if (card.name === synergy.leader) {
+            // Does player already have the matching lore?
+            const hasLore = player.lore.some(l => l.name === synergy.lore);
+            if (hasLore) {
+              // Find this leader's rank among sorted leaders
+              const rank = sortedLeaders.findIndex(l => l.name === card.name);
+              if (rank >= 0 && rank < picksBeforeMyNextLeader) {
+                opportunityCost = Number.POSITIVE_INFINITY; // guarantee pick now
+                break;
+              }
+            }
+          }
+        }
+        if (opportunityCost === Number.POSITIVE_INFINITY) {
+          // choose immediately, skip rest of evaluation for this card
+          if (opportunityCost > bestOpportunityCost) {
+            bestOpportunityCost = opportunityCost;
+            bestCard = card;
+          }
+          continue;
+        }
+      }
       if (replacementIdx < sortedLeaders.length) {
         let replacementScore = getWeightedScore(sortedLeaders[replacementIdx], "leader");
         // Add synergy bonus for replacement
@@ -1441,6 +1467,10 @@ function getBestPick(playerIdx) {
       } else {
         opportunityCost = cardScore;
       }
+      // If no other players need leaders, prefer lore picks first (deprioritize leader)
+      if (competitorsForLeader === 0 && player.lore.length < getLoreCountForPlayer(playerIdx)) {
+        opportunityCost -= 100; // strong penalty so lore is chosen instead
+      }
     } else {
       // Lore: at most (numPlayers - 1) picks happen before my next turn,
       // and at most `competitorsForLore` of those opponents want lore.
@@ -1467,11 +1497,44 @@ function getBestPick(playerIdx) {
       }
       const loreTakenBefore = Math.min(competitorsForLore, picksBeforeMyNextLore);
       const replacementIdx = loreTakenBefore;
+      // If this lore would complete a synergy and opponents could take it before
+      // my next lore pick, guarantee it by forcing a very high opportunity cost
+      if (player.leader) {
+        for (const synergy of SYNERGIES) {
+          if (player.leader.name === synergy.leader && card.name === synergy.lore) {
+            const rank = sortedLore.findIndex(l => l.name === card.name);
+            if (rank >= 0 && rank < picksBeforeMyNextLore) {
+              opportunityCost = Number.POSITIVE_INFINITY;
+              break;
+            }
+          }
+        }
+        if (opportunityCost === Number.POSITIVE_INFINITY) {
+          if (opportunityCost > bestOpportunityCost) {
+            bestOpportunityCost = opportunityCost;
+            bestCard = card;
+          }
+          continue;
+        }
+      }
       if (replacementIdx < sortedLore.length) {
         let replacementScore = getWeightedScore(sortedLore[replacementIdx], "lore");
         // Add synergy bonus for replacement
         if (player.leader) {
           for (const synergy of SYNERGIES) {
+        // Also: if multiple lore partners exist for this leader, and opponents
+        // cannot take all of them before my next lore pick, treat synergy as guaranteed
+        const matchingLores = draft.availableLore.filter(l => SYNERGIES.some(s => s.leader === card.name && s.lore === l.name));
+        if (matchingLores.length > 0) {
+          if (matchingLores.length > picksBeforeMyNextLore) {
+            opportunityCost = Number.POSITIVE_INFINITY;
+            if (opportunityCost > bestOpportunityCost) {
+              bestOpportunityCost = opportunityCost;
+              bestCard = card;
+            }
+            continue;
+          }
+        }
             if (player.leader.name === synergy.leader && sortedLore[replacementIdx].name === synergy.lore) {
               const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
               replacementScore += bonus;
@@ -1492,6 +1555,23 @@ function getBestPick(playerIdx) {
         opportunityCost = cardScore - replacementScore;
       } else {
         opportunityCost = cardScore;
+      }
+      // Also: if multiple leader partners exist for this lore, and opponents
+      // cannot take all of them before my next leader pick, treat synergy as guaranteed
+      const matchingLeaders = draft.availableLeaders.filter(l => SYNERGIES.some(s => s.lore === card.name && s.leader === l.name));
+      if (matchingLeaders.length > 0) {
+        if (matchingLeaders.length > picksBeforeMyNextLeader) {
+          opportunityCost = Number.POSITIVE_INFINITY;
+          if (opportunityCost > bestOpportunityCost) {
+            bestOpportunityCost = opportunityCost;
+            bestCard = card;
+          }
+          continue;
+        }
+      }
+      // If no other players need lore, prefer leader picks first (deprioritize lore)
+      if (competitorsForLore === 0 && !player.leader) {
+        opportunityCost -= 100; // strong penalty so leader is chosen instead
       }
     }
 
