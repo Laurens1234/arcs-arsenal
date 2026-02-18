@@ -589,18 +589,32 @@
   border-color: var(--border-dim);
 }
 
-/* Make pool action buttons (Random / Clear) more visible and consistent */
+/* Make pool action buttons (Random / Clear) outline-only with colored border */
 .pool-actions .btn-sm {
-  background: var(--accent);
-  color: #000;
-  border: none;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
   font-weight: 700;
   box-shadow: none;
+  transition: transform 0.12s, background 0.12s, box-shadow 0.12s;
+}
+
+/* Red outline variant for destructive/special pool actions (Clear) */
+.pool-actions .btn-sm.btn-danger {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+
+.pool-actions .btn-sm.btn-danger:hover {
+  transform: translateY(-2px);
+  background: rgba(248,113,113,0.06);
+  box-shadow: 0 8px 20px rgba(248,113,113,0.12);
 }
 
 .pool-actions .btn-sm:hover {
   transform: translateY(-2px);
-  background: var(--accent-hover);
+  background: rgba(0,0,0,0.03);
   box-shadow: 0 8px 20px var(--accent-glow);
 }
 
