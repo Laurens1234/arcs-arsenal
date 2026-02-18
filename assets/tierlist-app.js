@@ -1902,7 +1902,23 @@ function initDownload() {
         )
       );
 
-      const pixelRatio = 2;
+      const devicePR = window.devicePixelRatio || 1;
+
+      // Compute scale so card images are rendered at their natural resolution
+      const imgsForScale = Array.from(target.querySelectorAll('img'))
+        .filter((img) => img.naturalWidth && img.clientWidth);
+      let pixelRatio = devicePR;
+      if (imgsForScale.length > 0) {
+        const scales = imgsForScale.map((img) => img.naturalWidth / img.clientWidth);
+        const maxImgScale = Math.max(...scales);
+        pixelRatio = maxImgScale * devicePR;
+        // Cap extreme sizes to avoid generating enormous files
+        const MAX_EXPORT_SCALE = 4;
+        if (pixelRatio > MAX_EXPORT_SCALE) pixelRatio = MAX_EXPORT_SCALE;
+        // Ensure at least 1x
+        pixelRatio = Math.max(1, pixelRatio);
+      }
+
       const blob = await toBlob(target, {
         pixelRatio,
         backgroundColor:

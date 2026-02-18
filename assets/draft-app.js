@@ -1356,6 +1356,7 @@ function getBestPick(playerIdx) {
   // who still need that category pick before you from it.
 
   const player = draft.players[playerIdx];
+  // No fixed discount: compute guaranteed combo net directly from scenarios
 
   // Count how many OTHER players still need a leader / lore
   let competitorsForLeader = 0;
@@ -2156,8 +2157,25 @@ async function saveDraftAsImage() {
       )
     );
 
+    const devicePR = window.devicePixelRatio || 1;
+
+    // Compute scale so card images are rendered at their natural resolution
+    const imgsForScale = Array.from(target.querySelectorAll('img'))
+      .filter((img) => img.naturalWidth && img.clientWidth);
+    let pixelRatio = devicePR;
+    if (imgsForScale.length > 0) {
+      const scales = imgsForScale.map((img) => img.naturalWidth / img.clientWidth);
+      const maxImgScale = Math.max(...scales);
+      pixelRatio = maxImgScale * devicePR;
+      // Cap extreme sizes to avoid generating enormous files
+      const MAX_EXPORT_SCALE = 4;
+      if (pixelRatio > MAX_EXPORT_SCALE) pixelRatio = MAX_EXPORT_SCALE;
+      // Ensure at least 1x
+      pixelRatio = Math.max(1, pixelRatio);
+    }
+
     const blob = await toBlob(target, {
-      pixelRatio: 2,
+      pixelRatio,
       backgroundColor:
         document.documentElement.dataset.theme === "light"
           ? "#f5f7fa"
