@@ -193,6 +193,18 @@
   transition: all 0.2s;
 }
 
+/* Ensure the Best Pick algorithm buttons don't expand and wrap when placed inline
+   with the help button. This keeps the "?" from being squashed and prevents the
+   Deep button from dropping below the Quick button. */
+#bestPickAlgoGroup {
+  flex-wrap: nowrap;
+}
+
+#bestPickAlgoGroup .btn-option {
+  flex: 0 0 auto;
+  min-width: 64px;
+}
+
 .btn-option:hover {
   border-color: var(--accent);
   color: var(--text);
@@ -231,6 +243,26 @@
 #simulationSims {
   min-width: 180px;
   width: 180px;
+}
+
+/* Keep the simulation controls compact and prevent the explanatory note
+   from wrapping onto multiple lines so the Deep/Quick buttons stay inline. */
+#simulationControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+  flex-wrap: nowrap;
+}
+
+#simulationControls .sim-note {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-left: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
 }
 
 .range-labels {

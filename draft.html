@@ -250,15 +250,11 @@
               <label class="setup-label">Best Pick Algorithm</label>
               <div style="display:flex;align-items:center;gap:8px">
                 <div class="btn-group" id="bestPickAlgoGroup">
-                  <button class="btn-option active" data-value="opportunity">Quick</button>
+                  <button class="btn-option active" data-value="opportunity">Safe</button>
                   <button class="btn-option" data-value="simulation">Deep</button>
                 </div>
                 <button id="bestPickHelp" class="btn-sm btn-help" title="How Best Pick works">?</button>
-                <div id="simulationControls" style="display:none;align-items:center;gap:8px;margin-left:8px">
-                  <input id="simulationSims" title="Higher = more accurate but slower" type="range" class="setup-range" min="10" max="500" step="10" value="30" />
-                  <span id="simulationSimsDisplay" class="range-display">30</span>
-                  <span class="sim-note" style="font-size:0.8rem;color:var(--text-muted);margin-left:6px">Higher = more accurate, slower</span>
-                </div>
+                <div id="simulationControls" style="display:none;align-items:center;gap:8px;margin-left:8px"></div>
               </div>
             </div>
           </div>
@@ -388,6 +384,12 @@
       <button id="bestPickClose" class="btn-sm btn-close" aria-label="Close">✕</button>
     </div>
     <div class="modal-body">
+      <h4>TL;DR</h4>
+      <p><strong>Safe</strong>: fast, opportunity-cost based; favors safe immediate synergies and replacement value.
+      <br><strong>Deep</strong>: more thorough opponent-aware evaluation that prioritizes downstream combos and blocking considerations.</p>
+
+      <hr />
+
       <p>The algorithm evaluates each pick by its <strong>opportunity cost</strong>: how much value you'd lose by not taking it now versus the realistic replacement you could get later.</p>
       <ul>
         <li><strong>Base value:</strong> card tier score × weight (leaders are weighted more).</li>
@@ -396,7 +398,7 @@
         <li><strong>Guaranteed-partner logic:</strong> when multiple matching partners exist, the algorithm simulates opponent behavior (taking matching partners first or not) and computes the net benefit of securing a combo versus the expected replacement if you wait.</li>
         <li><strong>Blocking simulation:</strong> the algorithm considers opponents blocking your combo and compares outcomes across scenarios to decide if pursuing the combo is worth it.</li>
       </ul>
-      <p><strong>Quick</strong>: The default algorithm computes an "opportunity cost" for each pick: the value difference between taking the card now and the realistic replacement you are likely to get later. It accounts for immediate synergies with cards you already own and models how opponents might block your combos.</p>
-      <p><strong>Deep</strong>: When you select the <em>Deep</em> algorithm, the tool tests each candidate pick by simulating complete drafts multiple times using Monte Carlo tree search simulations. For each candidate it applies that pick to your board, then simulates the remaining draft where other players choose picks to maximize their own final score (via short rollouts). Each simulation produces your final score; the algorithm averages those scores across simulations and recommends the pick with the highest expected final score. Increasing the simulation count makes recommendations more stable but increases runtime.</p>
-  </div>
+      <p><strong>Safe</strong>: The default algorithm computes an "opportunity cost" for each pick: the value difference between taking the card now and the realistic replacement you are likely to get later. It accounts for immediate synergies with cards you already own and models how opponents might block your combos.</p>
+      <p><strong>Deep</strong>: The Deep algorithm evaluates candidates by simulating the remainder of the draft with opponents modeled using short lookahead evaluations. It explicitly considers opponent blocking and longer-term payoffs, so its recommendations focus more on downstream value and combos compared to Quick. Deep assumes other players draft to maximize their own final score (near-optimal play). By contrast, Quick prioritizes safe, immediate synergies and replacement value rather than deep opponent modeling.</p>
+    </div>
 </div>
