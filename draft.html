@@ -250,8 +250,8 @@
               <label class="setup-label">Best Pick Algorithm</label>
               <div style="display:flex;align-items:center;gap:8px">
                 <div class="btn-group" id="bestPickAlgoGroup">
-                  <button class="btn-option active" data-value="opportunity">Algorithmic</button>
-                  <button class="btn-option" data-value="simulation">Simulation</button>
+                  <button class="btn-option active" data-value="opportunity">Quick</button>
+                  <button class="btn-option" data-value="simulation"Deep</button>
                 </div>
                 <button id="bestPickHelp" class="btn-sm btn-help" title="How Best Pick works">?</button>
                 <div id="simulationControls" style="display:none;align-items:center;gap:8px;margin-left:8px">
@@ -396,8 +396,8 @@
         <li><strong>Guaranteed-partner logic:</strong> when multiple matching partners exist, the algorithm simulates opponent behavior (taking matching partners first or not) and computes the net benefit of securing a combo versus the expected replacement if you wait.</li>
         <li><strong>Blocking simulation:</strong> the algorithm considers opponents blocking your combo and compares outcomes across scenarios to decide if pursuing the combo is worth it.</li>
       </ul>
-      <p><strong>Algorithmic (Opportunity-Cost)</strong>: The default algorithm computes an "opportunity cost" for each pick: the value difference between taking the card now and the realistic replacement you are likely to get later. It accounts for immediate synergies with cards you already own and models how opponents might block your combos.</p>
-      <p><strong>Simulation:</strong>: When you select the <em>Simulation</em> algorithm, the tool tests each candidate pick by simulating complete drafts multiple times. For each candidate it applies that pick to your board, then simulates the remaining draft where other players choose picks to maximize their own final score (via short rollouts). Each simulation produces your final score; the algorithm averages those scores across simulations and recommends the pick with the highest expected final score. Increasing the simulation count makes recommendations more stable but increases runtime.</p>
+      <p>strong>Quick</strong>: The default algorithm computes an "opportunity cost" for each pick: the value difference between taking the card now and the realistic replacement you are likely to get later. It accounts for immediate synergies with cards you already own and models how opponents might block your combos.</p>
+      <p>strong>Deep</strong>: When you select the <em>Deep</em> algorithm, the tool tests each candidate pick by simulating complete drafts multiple times. For each candidate it applies that pick to your board, then simulates the remaining draft where other players choose picks to maximize their own final score (via short rollouts). Each simulation produces your final score; the algorithm averages those scores across simulations and recommends the pick with the highest expected final score. Increasing the simulation count makes recommendations more stable but increases runtime.</p>
     </div>
   </div>
 </div>
