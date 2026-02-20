@@ -976,6 +976,202 @@
   text-transform: uppercase;
 }
 
+/* Highlight all pool cards while hovering a single card in the select pool */
+.pool-hover .pool-card {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.12);
+  border-color: rgba(255,255,255,0.06);
+}
+.pool-hover .pool-card .pool-card-name {
+  color: var(--text);
+}
+
+/* Highlight only cards that match the hovered card's synergies. */
+.pool-highlight-mode-pop .pool-card.pool-card-highlight,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-positive,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-negative,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-self {
+  transform: translateY(-6px) scale(1.03);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.16);
+  border-color: var(--accent);
+}
+.pool-highlight-mode-pop .pool-card.pool-card-highlight .pool-card-name,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-positive .pool-card-name,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-negative .pool-card-name,
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-self .pool-card-name {
+  color: var(--text);
+  font-weight: 700;
+}
+
+/* Positive (green) / Negative (red) highlight outlines (pop mode) */
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-pop .pool-card.pool-card-highlight-self {
+  box-shadow: 0 16px 36px rgba(0,0,0,0.18);
+}
+
+/* Brightness mode: dim non-partners but still show colored outlines for partners */
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-positive,
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-negative,
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-self {
+  font-weight: 700;
+}
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .pool-card.pool-card-highlight-self {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.14);
+}
+
+/* Draft-area variants: mirror pool highlight behavior for .draft-card */
+.pool-highlight-mode-pop .draft-card.pool-card-highlight,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-positive,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-negative,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-self {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+  border-color: var(--accent);
+}
+.pool-highlight-mode-pop .draft-card.pool-card-highlight .draft-card-name,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-positive .draft-card-name,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-negative .draft-card-name,
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-self .draft-card-name {
+  color: var(--text);
+  font-weight: 700;
+}
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+
+/* Player-picked variants: mirror draft/pool highlight behavior for .player-pick */
+.pool-highlight-mode-pop .player-pick.pool-card-highlight,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-positive,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-negative,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-self {
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.10);
+  border-color: var(--accent);
+}
+.pool-highlight-mode-pop .player-pick.pool-card-highlight .pick-name,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-positive .pick-name,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-negative .pick-name,
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-self .pick-name {
+  color: var(--text);
+  font-weight: 700;
+}
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-pop .player-pick.pool-card-highlight-self {
+  box-shadow: 0 10px 22px rgba(0,0,0,0.14);
+}
+
+/* Brightness mode: dim non-partners but still show colored outlines for player picks */
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-positive,
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-negative,
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-self {
+  font-weight: 700;
+}
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .player-pick.pool-card-highlight-self {
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+/* Dim non-highlighted player-picked cards when a hover is active */
+.pool-dimmed .player-pick:not(.pool-card-highlight-positive):not(.pool-card-highlight-negative):not(.pool-card-highlight-self) {
+  filter: brightness(0.6) saturate(0.85);
+  opacity: 0.65;
+  transform: none;
+  box-shadow: none;
+}
+
+.pool-highlight-mode-pop .draft-card.pool-card-highlight-self {
+  box-shadow: 0 12px 28px rgba(0,0,0,0.14);
+}
+
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-positive,
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-negative,
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-self {
+  font-weight: 700;
+}
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-positive {
+  outline: 3px solid rgba(56, 198, 121, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-negative {
+  outline: 3px solid rgba(232, 84, 84, 0.95);
+  outline-offset: 6px;
+}
+.pool-highlight-mode-brightness .draft-card.pool-card-highlight-self {
+  box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+}
+
+.pool-dimmed .draft-card:not(.pool-card-highlight-positive):not(.pool-card-highlight-negative):not(.pool-card-highlight-self) {
+  filter: brightness(0.6) saturate(0.85);
+  opacity: 0.65;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Dim non-highlighted cards when a hover is active */
+.pool-dimmed .pool-card:not(.pool-card-highlight-positive):not(.pool-card-highlight-negative):not(.pool-card-highlight-self) {
+  filter: brightness(0.6) saturate(0.85);
+  opacity: 0.65;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Exclude hovered elements from dimming */
+.pool-dimmed .draft-card.pool-card-hovered,
+.pool-dimmed .pool-card.pool-card-hovered,
+.pool-dimmed .player-pick.pool-card-hovered {
+  filter: none;
+  opacity: 1;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Also ensure any element the user is actively hovering or focusing remains bright */
+.pool-dimmed .draft-card:hover,
+.pool-dimmed .pool-card:hover,
+.pool-dimmed .player-pick:hover,
+.pool-dimmed .draft-card:focus,
+.pool-dimmed .pool-card:focus,
+.pool-dimmed .player-pick:focus {
+  filter: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
 .draft-card .synergy-badge {
   position: absolute;
   top: 4px;
