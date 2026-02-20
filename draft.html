@@ -202,6 +202,19 @@
                 <button class="btn-option" data-value="brightness">Brightness</button>
               </div>
             </div>
+            <!-- Synergy Filter -->
+            <div class="setup-group">
+              <label class="setup-label">Synergy Filter</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select id="synergyFilterMode" class="setup-input" style="width:140px">
+                  <option value="all">All</option>
+                  <option value="off">Off</option>
+                  <option value="abs">Above/Below</option>
+                </select>
+                <input id="synergyFilterThreshold" type="number" class="setup-input" step="0.5" value="0" style="width:80px" />
+              </div>
+              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:4px">Hide synergies outside chosen range.</div>
+            </div>
             <!-- Lores in Pool -->
             <div class="setup-group">
               <label class="setup-label">Lores in Pool</label>

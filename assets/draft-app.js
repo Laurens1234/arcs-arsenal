@@ -36,6 +36,8 @@ const el = {
   leaderPool: document.getElementById("leaderPool"),
   lorePool: document.getElementById("lorePool"),
    poolHighlightGroup: document.getElementById("poolHighlightGroup"),
+  synergyFilterMode: document.getElementById("synergyFilterMode"),
+  synergyFilterThreshold: document.getElementById("synergyFilterThreshold"),
   leaderPoolCount: document.getElementById("leaderPoolCount"),
   lorePoolCount: document.getElementById("lorePoolCount"),
   randomLeaders: document.getElementById("randomLeaders"),
@@ -103,6 +105,9 @@ let draft = {
   // Best pick algorithm: 'opportunity' (original) or 'simulation'
   bestPickAlgo: 'opportunity',
   poolHighlightStyle: 'none',
+  // Synergy filter: 'all' (default), 'off', 'above', 'below'
+  synergyFilterMode: 'all',
+  synergyFilterThreshold: 0,
   debugSim: false,
   lastSimScores: {},
   // Simulation settings (slider removed; deep uses one rollout per candidate)
@@ -217,6 +222,23 @@ function getLoreCountForPlayer(playerIndex, draftObj = draft) {
   return draftObj.lorePerPlayer;
 }
 
+// Synergy helpers: evaluate raw bonus and decide if it should be included
+function getSynergyBonusValue(s) {
+  try {
+    const v = typeof s.bonus === 'function' ? s.bonus(draft.numPlayers) : s.bonus;
+    return Number(v || 0);
+  } catch (e) { return 0; }
+}
+
+function synergyAllowedByFilter(bonusVal) {
+  const mode = draft.synergyFilterMode || 'all';
+  const thr = Number(draft.synergyFilterThreshold || 0);
+  if (mode === 'off') return false;
+  if (mode === 'all') return true;
+  if (mode === 'abs') return Math.abs(bonusVal) > thr;
+  return true;
+}
+
 // ======= Simulation helpers =======
 function cloneDraft(src) {
   const copy = JSON.parse(JSON.stringify(src));
@@ -318,7 +340,7 @@ function getSynergyBonusForDraft(player, draftObj) {
           for (const t of l.card.tags) colKeys.push(normalizeText(t));
         }
         const val = lookupSynergyValue(rowKeys, colKeys, draftObj.numPlayers);
-        if (val !== null) bonus += val;
+        if (val !== null && synergyAllowedByFilter(Number(val))) bonus += val;
       }
     }
 
@@ -332,13 +354,13 @@ function getSynergyBonusForDraft(player, draftObj) {
         if (a.card && Array.isArray(a.card.tags)) for (const t of a.card.tags) aRow.push(normalizeText(t));
         if (b.card && Array.isArray(b.card.tags)) for (const t of b.card.tags) bCol.push(normalizeText(t));
         const vab = lookupSynergyValue(aRow, bCol, draftObj.numPlayers);
-        if (vab !== null) bonus += vab;
+        if (vab !== null && synergyAllowedByFilter(Number(vab))) bonus += vab;
         const bRow = [normalizeText(b.name)];
         const aCol = [normalizeText(a.name)];
         if (b.card && Array.isArray(b.card.tags)) for (const t of b.card.tags) bRow.push(normalizeText(t));
         if (a.card && Array.isArray(a.card.tags)) for (const t of a.card.tags) aCol.push(normalizeText(t));
         const vba = lookupSynergyValue(bRow, aCol, draftObj.numPlayers);
-        if (vba !== null) bonus += vba;
+        if (vba !== null && synergyAllowedByFilter(Number(vba))) bonus += vba;
       }
     }
 
@@ -350,8 +372,8 @@ function getSynergyBonusForDraft(player, draftObj) {
     if (player.leader && player.leader.name === synergy.leader) {
       const hasLore = player.lore.some(l => l.name === synergy.lore);
       if (hasLore) {
-        const synergyBonus = typeof synergy.bonus === 'function' ? synergy.bonus(draftObj.numPlayers) : synergy.bonus;
-        bonus += synergyBonus;
+        const synergyBonus = getSynergyBonusValue(synergy);
+        if (synergyAllowedByFilter(synergyBonus)) bonus += synergyBonus;
       }
     }
   }
@@ -360,8 +382,8 @@ function getSynergyBonusForDraft(player, draftObj) {
     const hasA = player.lore.some(l => l.name === synergy.leader);
     const hasB = player.lore.some(l => l.name === synergy.lore);
     if (hasA && hasB) {
-      const synergyBonus = typeof synergy.bonus === 'function' ? synergy.bonus(draftObj.numPlayers) : synergy.bonus;
-      bonus += synergyBonus;
+      const synergyBonus = getSynergyBonusValue(synergy);
+      if (synergyAllowedByFilter(synergyBonus)) bonus += synergyBonus;
     }
   }
   return bonus;
@@ -396,8 +418,8 @@ function chooseGreedyPickForDraft(draftObj, playerIdx) {
         if (card.name === s.leader) {
           const hasLore = player.lore.some(l => l.name === s.lore);
           if (hasLore) {
-            const bonus = typeof s.bonus === 'function' ? s.bonus(draftObj.numPlayers) : s.bonus;
-            val += bonus;
+            const bonus = getSynergyBonusValue(s);
+            if (synergyAllowedByFilter(bonus)) val += bonus;
           }
         }
       }
@@ -405,8 +427,8 @@ function chooseGreedyPickForDraft(draftObj, playerIdx) {
     if (card.pickType === 'lore' && player.leader) {
       for (const s of SYNERGIES) {
         if (player.leader.name === s.leader && card.name === s.lore) {
-          const bonus = typeof s.bonus === 'function' ? s.bonus(draftObj.numPlayers) : s.bonus;
-          val += bonus;
+          const bonus = getSynergyBonusValue(s);
+          if (synergyAllowedByFilter(bonus)) val += bonus;
         }
       }
     }
@@ -420,25 +442,25 @@ function chooseGreedyPickForDraft(draftObj, playerIdx) {
           if (existing.card && Array.isArray(existing.card.tags)) for (const t of existing.card.tags) rowKeys.push(normalizeText(t));
           if (card.card && Array.isArray(card.card.tags)) for (const t of card.card.tags) colKeys.push(normalizeText(t));
           const v1 = lookupSynergyValue(rowKeys, colKeys, draftObj.numPlayers);
-          if (v1 !== null) val += v1;
+          if (v1 !== null && synergyAllowedByFilter(Number(v1))) val += v1;
 
           const rowKeys2 = [normalizeText(card.name)];
           const colKeys2 = [normalizeText(existing.name)];
           if (card.card && Array.isArray(card.card.tags)) for (const t of card.card.tags) rowKeys2.push(normalizeText(t));
           if (existing.card && Array.isArray(existing.card.tags)) for (const t of existing.card.tags) colKeys2.push(normalizeText(t));
           const v2 = lookupSynergyValue(rowKeys2, colKeys2, draftObj.numPlayers);
-          if (v2 !== null) val += v2;
+          if (v2 !== null && synergyAllowedByFilter(Number(v2))) val += v2;
         }
       }
       // Legacy SYNERGIES entries
       for (const s of SYNERGIES) {
         if (card.name === s.lore && player.lore.some(l => l.name === s.leader)) {
-          const bonus = typeof s.bonus === 'function' ? s.bonus(draftObj.numPlayers) : s.bonus;
-          val += bonus;
+          const bonus = getSynergyBonusValue(s);
+          if (synergyAllowedByFilter(bonus)) val += bonus;
         }
         if (card.name === s.leader && player.lore.some(l => l.name === s.lore)) {
-          const bonus = typeof s.bonus === 'function' ? s.bonus(draftObj.numPlayers) : s.bonus;
-          val += bonus;
+          const bonus = getSynergyBonusValue(s);
+          if (synergyAllowedByFilter(bonus)) val += bonus;
         }
       }
     }
@@ -1220,6 +1242,31 @@ function setupBtnGroup(container, onChange) {
   });
 }
 
+// Initialize synergy filter controls
+if (el.synergyFilterMode && el.synergyFilterThreshold) {
+  el.synergyFilterMode.value = draft.synergyFilterMode || 'all';
+  el.synergyFilterThreshold.value = draft.synergyFilterThreshold || 0;
+  function updateSynergyOptionLabel() {
+    try {
+      const opt = el.synergyFilterMode.querySelector('option[value="abs"]');
+      if (!opt) return;
+      const thr = Number(draft.synergyFilterThreshold || 0);
+      const disp = Number.isInteger(thr) ? String(thr) : String(thr);
+      opt.textContent = `Above/Below (±${disp})`;
+    } catch (e) {}
+  }
+  updateSynergyOptionLabel();
+  el.synergyFilterMode.addEventListener('change', (e) => {
+    draft.synergyFilterMode = e.target.value;
+    renderPoolCards(); renderAvailableCards(); renderPlayerBoards();
+  });
+  el.synergyFilterThreshold.addEventListener('input', (e) => {
+    draft.synergyFilterThreshold = Number(e.target.value || 0);
+    renderPoolCards(); renderAvailableCards(); renderPlayerBoards();
+    updateSynergyOptionLabel();
+  });
+}
+
 // Clear any pool highlight classes from both pools
 function clearPoolHighlights() {
   try {
@@ -1293,21 +1340,21 @@ function applyHighlightsForCard(name, type, source = 'pool') {
       if (type === 'leader') {
         if (s.leader === name) {
           const partner = s.lore;
-          const bonus = (typeof s.bonus === 'function') ? s.bonus(draft.numPlayers) : s.bonus;
-          partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
+          const bonus = getSynergyBonusValue(s);
+          if (synergyAllowedByFilter(bonus)) partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
         }
       } else {
         if (s.lore === name) {
           const partner = s.leader;
-          const bonus = (typeof s.bonus === 'function') ? s.bonus(draft.numPlayers) : s.bonus;
-          partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
+          const bonus = getSynergyBonusValue(s);
+          if (synergyAllowedByFilter(bonus)) partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
         }
         if (s.leader === name) {
           const otherIsLore = allLore.some(x => x.name === s.lore);
           if (otherIsLore) {
             const partner = s.lore;
-            const bonus = (typeof s.bonus === 'function') ? s.bonus(draft.numPlayers) : s.bonus;
-            partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
+            const bonus = getSynergyBonusValue(s);
+            if (synergyAllowedByFilter(bonus)) partners.set(partner, (partners.get(partner) || 0) + Number(bonus || 0));
           }
         }
       }
@@ -1608,9 +1655,11 @@ function renderPoolSection(container, entries, selected, type) {
       imgHTML = `<img class="pool-card-img" src="${imgUrl}" alt="${entry.name}" loading="lazy" />`;
     }
 
-    // Add synergy info
+    // Add synergy info (respect user filter)
     let hasSynergy = false;
     for (const synergy of SYNERGIES) {
+      const bonus = getSynergyBonusValue(synergy);
+      if (!synergyAllowedByFilter(bonus)) continue;
       if (type === "leader" && entry.name === synergy.leader) { hasSynergy = true; break; }
       if (type === "lore") {
         if (entry.name === synergy.lore) { hasSynergy = true; break; }
@@ -1641,14 +1690,14 @@ function renderPoolSection(container, entries, selected, type) {
     let hasPositive = false;
     let hasNegative = false;
     for (const synergy of SYNERGIES) {
+      const bonus = getSynergyBonusValue(synergy);
+      if (!synergyAllowedByFilter(bonus)) continue;
       if (type === "leader" && entry.name === synergy.leader) {
-        const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
         const sign = bonus > 0 ? '+' : '';
         synergyEntries.push({ text: `${sign}${Number(bonus).toFixed(1)} pts with ${synergy.lore}`, bonus: Number(bonus) });
         if (bonus > 0) hasPositive = true; else hasNegative = true;
       } else if (type === "lore") {
         if (entry.name === synergy.lore) {
-          const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
           const sign = bonus > 0 ? '+' : '';
           synergyEntries.push({ text: `${sign}${Number(bonus).toFixed(1)} pts with ${synergy.leader}`, bonus: Number(bonus) });
           if (bonus > 0) hasPositive = true; else hasNegative = true;
@@ -1656,7 +1705,6 @@ function renderPoolSection(container, entries, selected, type) {
           // treat CSV/legacy entry where leader field actually names a lore and lore field names another lore
           const otherIsLore = allLore.some(x => x.name === synergy.lore);
           if (otherIsLore) {
-            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
             const sign = bonus > 0 ? '+' : '';
             synergyEntries.push({ text: `${sign}${Number(bonus).toFixed(1)} pts with ${synergy.lore}`, bonus: Number(bonus) });
             if (bonus > 0) hasPositive = true; else hasNegative = true;
@@ -2615,9 +2663,10 @@ function renderPlayerBoards() {
       let hasNegative = false;
       for (const synergy of SYNERGIES) {
         if (player.leader.name === synergy.leader) {
+          const bonus = getSynergyBonusValue(synergy);
+          if (!synergyAllowedByFilter(bonus)) continue;
           const hasLore = player.lore.some(l => l.name === synergy.lore);
           if (hasLore) {
-            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
             synergyEntries.push({ text: `${bonus > 0 ? '+' : ''}${Number(bonus).toFixed(1)} pts with ${synergy.lore}`, bonus: Number(bonus) });
             if (bonus > 0) hasPositive = true; else hasNegative = true;
             hasSynergy = true;
@@ -2668,7 +2717,8 @@ function renderPlayerBoards() {
         if (player.leader) {
           for (const synergy of SYNERGIES) {
             if (player.leader.name === synergy.leader && player.lore[j].name === synergy.lore) {
-              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
+              const bonus = getSynergyBonusValue(synergy);
+              if (!synergyAllowedByFilter(bonus)) continue;
               synergyEntriesLore.push({ text: `${bonus > 0 ? '+' : ''}${Number(bonus).toFixed(1)} pts with ${synergy.leader}`, bonus: Number(bonus) });
               if (bonus > 0) hasPositiveL = true; else hasNegativeL = true;
               hasSynergy = true;
@@ -2686,7 +2736,7 @@ function renderPlayerBoards() {
             if (other.card && Array.isArray(other.card.tags)) for (const t of other.card.tags) rowA.push(normalizeText(t));
             if (player.lore[j].card && Array.isArray(player.lore[j].card.tags)) for (const t of player.lore[j].card.tags) colA.push(normalizeText(t));
             const vab = lookupSynergyValue(rowA, colA, draft.numPlayers);
-            if (vab !== null) {
+            if (vab !== null && synergyAllowedByFilter(Number(vab))) {
               synergyEntriesLore.push({ text: `${vab > 0 ? '+' : ''}${Number(vab).toFixed(1)} pts with ${other.name}`, bonus: Number(vab) });
               if (vab > 0) hasPositiveL = true; else hasNegativeL = true;
               hasSynergy = true;
@@ -2696,7 +2746,7 @@ function renderPlayerBoards() {
             if (player.lore[j].card && Array.isArray(player.lore[j].card.tags)) for (const t of player.lore[j].card.tags) rowB.push(normalizeText(t));
             if (other.card && Array.isArray(other.card.tags)) for (const t of other.card.tags) colB.push(normalizeText(t));
             const vba = lookupSynergyValue(rowB, colB, draft.numPlayers);
-            if (vba !== null) {
+            if (vba !== null && synergyAllowedByFilter(Number(vba))) {
               synergyEntriesLore.push({ text: `${vba > 0 ? '+' : ''}${Number(vba).toFixed(1)} pts with ${other.name}`, bonus: Number(vba) });
               if (vba > 0) hasPositiveL = true; else hasNegativeL = true;
               hasSynergy = true;
@@ -2836,6 +2886,8 @@ function renderAvailableCards() {
       // (either currently available or already picked by a player). Support lore-lore pairs.
       let showsSynergy = false;
       for (const synergy of SYNERGIES) {
+        const bonus = getSynergyBonusValue(synergy);
+        if (!synergyAllowedByFilter(bonus)) continue;
         if (card.pickType === "leader" && card.name === synergy.leader) {
           const partnerInDraft = draft.availableLore.some(l => l.name === synergy.lore) ||
                                   draft.players.some(p => p.lore.some(l => l.name === synergy.lore));
@@ -2895,11 +2947,12 @@ function renderAvailableCards() {
         // Build synergy entries (only include partners in draft) and sort high->low
         let synergyEntries = [];
         for (const synergy of SYNERGIES) {
+          const bonus = getSynergyBonusValue(synergy);
+          if (!synergyAllowedByFilter(bonus)) continue;
           if (card.pickType === "leader" && card.name === synergy.leader) {
             const partnerInDraft = draft.availableLore.some(l => l.name === synergy.lore) ||
                                     draft.players.some(p => p.lore.some(l => l.name === synergy.lore));
             if (!partnerInDraft) continue;
-            const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
             synergyEntries.push({ text: `${bonus > 0 ? '+' : ''}${Number(bonus).toFixed(1)} pts with ${synergy.lore}`, bonus: Number(bonus) });
             if (bonus > 0) hasPositive = true; else hasNegative = true;
           } else if (card.pickType === "lore") {
@@ -2910,7 +2963,6 @@ function renderAvailableCards() {
                                       draft.availableLore.some(l => l.name === synergy.leader) ||
                                       draft.players.some(p => p.lore.some(l => l.name === synergy.leader));
               if (!partnerInDraft) continue;
-              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
               synergyEntries.push({ text: `${bonus > 0 ? '+' : ''}${Number(bonus).toFixed(1)} pts with ${synergy.leader}`, bonus: Number(bonus) });
               if (bonus > 0) hasPositive = true; else hasNegative = true;
             }
@@ -2919,7 +2971,6 @@ function renderAvailableCards() {
               const partnerInDraft = draft.availableLore.some(l => l.name === synergy.lore) ||
                                       draft.players.some(p => p.lore.some(l => l.name === synergy.lore));
               if (!partnerInDraft) continue;
-              const bonus = typeof synergy.bonus === 'function' ? synergy.bonus(draft.numPlayers) : synergy.bonus;
               synergyEntries.push({ text: `${bonus > 0 ? '+' : ''}${Number(bonus).toFixed(1)} pts with ${synergy.lore}`, bonus: Number(bonus) });
               if (bonus > 0) hasPositive = true; else hasNegative = true;
             }
