@@ -957,6 +957,12 @@
   color: var(--text-dim);
 }
 
+.draft-card-heuristic {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
 .draft-card-rec-badge {
   position: absolute;
   top: 4px;

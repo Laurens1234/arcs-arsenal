@@ -27,5 +27,6 @@ export const CONFIG = {
   // Optional CSV with synergy values (rows = source tag/lead, columns = target tag/lead).
   // Use a Google Sheets CSV export link (publish or public access recommended).
   // Example: https://docs.google.com/spreadsheets/d/FILE_ID/export?format=csv&gid=0
-  synergyCsvUrl: "",
+  synergyCsvUrl:
+    "https://docs.google.com/spreadsheets/d/1Ofzfrhi0JHFgniJevYy1u9ParOs5v1vSpUZqElu-6yI/export?format=csv&gid=0",
 };
