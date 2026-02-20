@@ -24,4 +24,8 @@ export const CONFIG = {
   // Only show cards with any of these tags. Leave empty to show everything.
   // Example: ["Base Court", "Lore", "Leader"]
   includeAnyTags: [],
+  // Optional CSV with synergy values (rows = source tag/lead, columns = target tag/lead).
+  // Use a Google Sheets CSV export link (publish or public access recommended).
+  // Example: https://docs.google.com/spreadsheets/d/FILE_ID/export?format=csv&gid=0
+  synergyCsvUrl: "",
 };

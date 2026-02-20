@@ -178,6 +178,59 @@ const SYNERGIES = [
   { leader: "Anarchist", lore: "Living Structures", bonus: (numPlayers) => draft.generatedByBalanced ? -4 : -2 },
 ];
 
+// Synergy table loaded from CSV: Map<normalizedRowKey, Map<normalizedColKey, number|function>>
+let SYNERGY_TABLE = null;
+
+function getNumeric(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseBonusCell(cell) {
+  if (cell === null || cell === undefined) return null;
+  const s = String(cell).trim();
+  if (s === "") return null;
+  const num = Number(s);
+  if (!Number.isNaN(num)) return num;
+  // Parse per-player mappings like "3p:4;4p:2"
+  const parts = s.split(/[;,]/).map(p => p.trim()).filter(Boolean);
+  const mapping = {};
+  for (const part of parts) {
+    const m = part.match(/^(\d+)p\s*[:=]\s*([+-]?\d+(?:\.\d+)?)$/i);
+    if (m) mapping[Number(m[1])] = Number(m[2]);
+  }
+  if (Object.keys(mapping).length > 0) {
+    return function(numPlayers) {
+      if (mapping[numPlayers] !== undefined) return mapping[numPlayers];
+      if (numPlayers === 2 && mapping[3] !== undefined) return mapping[3];
+      if (mapping[3] !== undefined) return mapping[3];
+      const keys = Object.keys(mapping).map(k=>Number(k)).sort();
+      if (keys.length === 1) return mapping[keys[0]];
+      return 0;
+    };
+  }
+  const mnum = s.match(/([+-]?\d+(?:\.\d+)?)/);
+  if (mnum) return Number(mnum[1]);
+  return null;
+}
+
+function lookupSynergyValue(rowKeys, colKeys, numPlayers) {
+  if (!SYNERGY_TABLE) return null;
+  for (const r of rowKeys) {
+    const row = SYNERGY_TABLE.get(r);
+    if (!row) continue;
+    for (const c of colKeys) {
+      if (row.has(c)) {
+        const v = row.get(c);
+        if (typeof v === 'function') return v(numPlayers);
+        return v;
+      }
+    }
+  }
+  return null;
+}
+
 function assignValues(entries) {
   // Group by tier, assign sub-values within each tier based on position
   const grouped = new Map();
@@ -2488,11 +2541,22 @@ async function init() {
   el.saveDraftImg.addEventListener("click", saveDraftAsImage);
 
   try {
-    setStatus("Loading cards & tier data…");
-    const [cards, tierRows, rankedRows] = await Promise.all([
+    setStatus("Loading cards, tiers & synergy sheet…");
+    const [cards, tierRows, rankedRows, synergyRows] = await Promise.all([
       loadCards(),
       loadTierList(),
       loadRankedSheet(),
+      (async () => {
+        if (!CONFIG.synergyCsvUrl) return null;
+        try {
+          const text = await fetchText(CONFIG.synergyCsvUrl);
+          const parsed = Papa.parse(text, { header: false, skipEmptyLines: false });
+          return parsed.data ?? null;
+        } catch (err) {
+          console.warn('Failed to load synergy CSV', err);
+          return null;
+        }
+      })(),
     ]);
 
     const personal = parseTierData(tierRows, cards);
@@ -2505,6 +2569,33 @@ async function init() {
     const ranked = parseRankedData(rankedRows, cards);
     dataLeaders = ranked.leaders;
     dataLore = ranked.lore;
+
+    // Build SYNERGY_TABLE from CSV if provided
+    if (synergyRows && synergyRows.length > 0) {
+      // First row is headers (skip first cell)
+      const headers = synergyRows[0].slice(1).map(h => normalizeText(String(h ?? "")));
+      const table = new Map();
+      for (let i = 1; i < synergyRows.length; i++) {
+        const row = synergyRows[i];
+        if (!row || row.length === 0) continue;
+        const rowKey = normalizeText(String(row[0] ?? "").trim());
+        if (!rowKey) continue;
+        const map = new Map();
+        for (let j = 1; j < row.length && j-1 < headers.length; j++) {
+          const colKey = headers[j-1];
+          const val = parseBonusCell(row[j]);
+          if (colKey && val !== null) {
+            if (typeof val === 'number' && val === 0) continue;
+            map.set(colKey, val);
+          }
+        }
+        if (map.size > 0) table.set(rowKey, map);
+      }
+      SYNERGY_TABLE = table;
+      console.info('Loaded synergy sheet rows=', synergyRows.length);
+      setStatus('Synergy sheet loaded');
+      setTimeout(() => setStatus(''), 1500);
+    }
 
     // Parse Community tier data (static, no fetch needed)
     const comm3p = parseCommunityTierData("3p", cards);
