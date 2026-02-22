@@ -45,6 +45,15 @@ Add strategy guides to site:
 - Strategy guide for fundamentals
 - Leader specific
 
+## Campaign cards tier list
+
+## Fate card visualizer
+- visualize what cards are going to get added to your pool / the court deck / etc. based kn your act/pass/fail.
+
+## Good pivots graph
+
+
+
 ## Threads
 - [BGG](https://boardgamegeek.com/thread/3663140/arcs-arsenal-a-website-with-card-analytics-draft-s)
 - [Discord](https://discord.com/channels/1459242411325919317/1469409321065517136)
