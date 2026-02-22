@@ -144,6 +144,33 @@ function getImageUrl(card) {
   return `${CONFIG.cardImagesBaseUrl}${encodeURIComponent(card.image)}.png`;
 }
 
+// Map of normalized fate/leader names -> BGG guide thread URLs (only BGG links)
+const BGG_GUIDE_LINKS = {
+  steward: "https://boardgamegeek.com/thread/3329551/a-void-chronicler-s-guide-to-the-steward",
+  naturalist: "https://boardgamegeek.com/thread/3331117/a-void-chroniclers-guide-to-the-naturalist",
+  admiral: "https://boardgamegeek.com/thread/3332175/a-void-chroniclers-guide-to-the-admiral",
+  magnate: "https://boardgamegeek.com/thread/3345245/a-void-chroniclers-guide-to-the-magnate",
+  pacifist: "https://boardgamegeek.com/thread/3348381/a-void-chroniclers-guide-to-the-pacifist",
+  peacekeeper: "https://boardgamegeek.com/thread/3355715/a-void-chroniclers-guide-to-the-peacekeeper",
+  "blight speaker": "https://boardgamegeek.com/thread/3377854/a-void-chronicler-s-guide-to-the-blight-speaker",
+  guardian: "https://boardgamegeek.com/thread/3390717/a-void-chroniclers-guide-to-the-guardian",
+  believer: "https://boardgamegeek.com/thread/3394329/a-void-chroniclers-guide-to-the-believer",
+  "gate wraith": "https://boardgamegeek.com/thread/3426284/a-void-chroniclers-guide-to-the-gate-wraith",
+  advocate: "https://boardgamegeek.com/thread/3443509/the-void-chroniclers-guide-to-the-advocate",
+  caretaker: "https://boardgamegeek.com/thread/3457463/a-void-chroniclers-guide-to-the-caretaker",
+  hegemon: "https://boardgamegeek.com/thread/3461404/a-void-chroniclers-guide-to-the-hegemon",
+  conspirator: "https://boardgamegeek.com/thread/3467021/a-void-chroniclers-guide-to-conspirator",
+  redeemer: "https://boardgamegeek.com/thread/3475485/a-void-chroniclers-guide-to-redeemer",
+  overlord: "https://boardgamegeek.com/thread/3477308/a-void-chroniclers-guide-to-overlord",
+  pirate: "https://boardgamegeek.com/thread/3481548/a-void-chroniclers-guide-to-the-pirate",
+  warden: "https://boardgamegeek.com/thread/3484110/a-void-chroniclers-guide-to-the-warden",
+  pathfinder: "https://boardgamegeek.com/thread/3489162/a-void-chroniclers-guide-to-the-pathfinder",
+  judge: "https://boardgamegeek.com/thread/3493471/a-void-chroniclers-guide-to-the-judge",
+  partisan: "https://boardgamegeek.com/thread/3517302/a-void-chroniclers-guide-to-the-partisan",
+  founder: "https://boardgamegeek.com/thread/3517422/a-void-chronicler-s-guide-to-the-founder",
+  "planet breaker": "https://boardgamegeek.com/thread/3518298/a-void-chroniclers-guide-to-the-planet-breaker",
+  survivalist: "https://boardgamegeek.com/thread/3522217/a-void-chroniclers-guide-to-the-survivalist"
+};
 function formatCardText(text) {
   if (!text) return "";
   let formatted = text
@@ -824,7 +851,7 @@ function createCardElement(entry, type) {
   nameOverlay.textContent = entry.name;
   cardEl.appendChild(nameOverlay);
 
-  // Click to open modal (only when not editing)
+  // Click behavior: open the card modal (when not editing) if card data exists.
   if (entry.card) {
     cardEl.addEventListener("click", () => {
       if (!editMode) openModal(entry.card);
@@ -2146,6 +2173,36 @@ function openModal(card) {
   el.modalImg.alt = card.name;
   el.modalName.textContent = card.name;
   el.modalText.innerHTML = formatCardText(card.text);
+  // Remove any existing guide buttons
+  const existingBtns = el.modalText.parentElement.querySelectorAll('.modal-guide-btn');
+  existingBtns.forEach(b => { if (b && b.parentNode) b.parentNode.removeChild(b); });
+  // Add BGG guide button when a mapping exists (only BGG links)
+  const normName = normalizeText(card.name).replace(/^the /, '').trim();
+  const guideUrl = BGG_GUIDE_LINKS[normName];
+  if (guideUrl) {
+    const btn = document.createElement('a');
+    btn.className = 'btn-compare modal-guide-btn';
+    btn.href = guideUrl;
+    btn.target = '_blank';
+    btn.rel = 'noopener';
+    btn.style.display = 'inline-block';
+    btn.style.marginTop = '12px';
+    btn.textContent = 'Open Guide';
+    el.modalText.parentElement.appendChild(btn);
+    // Add a Buried Giant cards search link for the same tag (tag == card name)
+    const searchQuery = `game:"arcs" tag:"${card.name}"`;
+    const searchUrl = `https://cards.buriedgiantstudios.com/search?q=${encodeURIComponent(searchQuery)}`;
+    const bgLink = document.createElement('a');
+    bgLink.className = 'btn-compare modal-guide-btn';
+    bgLink.href = searchUrl;
+    bgLink.target = '_blank';
+    bgLink.rel = 'noopener';
+    bgLink.style.display = 'inline-block';
+    bgLink.style.marginTop = '8px';
+    bgLink.style.marginLeft = '8px';
+    bgLink.textContent = 'View related cards';
+    el.modalText.parentElement.appendChild(bgLink);
+  }
   el.modal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
