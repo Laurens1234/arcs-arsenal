@@ -103,6 +103,15 @@ function getVisibleEmptyTiers(type) {
   if (!visibleEmptyTiersByType.has(type)) visibleEmptyTiersByType.set(type, new Set());
   return visibleEmptyTiersByType.get(type);
 }
+// Ensure visible-empty tiers are stored in canonical TIER_ORDER
+function addVisibleEmptyTier(type, tier) {
+  const s = getVisibleEmptyTiers(type);
+  s.add(tier);
+  // Reorder the set to match TIER_ORDER so any iteration follows canonical order
+  const ordered = TIER_ORDER.filter(t => s.has(t));
+  s.clear();
+  for (const t of ordered) s.add(t);
+}
 let currentLeaderTab = '3p'; // current leader sub-tab
 
 // Touch drag and drop state
@@ -553,7 +562,7 @@ function buildTierListHTML(entries, container, type, sectionName) {
         btn.className = `add-tier-btn tier-${tier.toLowerCase()}`;
         btn.textContent = `+ ${tier}`;
         btn.addEventListener("click", () => {
-          visibleEmptyTiers.add(tier);
+          addVisibleEmptyTier(type, tier);
           rebuildCurrentView();
         });
         addBar.appendChild(btn);
@@ -1510,7 +1519,7 @@ function moveCard(name, newTier, type, insertBefore = null) {
   const oldTierStillHasCards = entries.some(e => e.tier === oldTier);
   const visibleEmptyTiers = getVisibleEmptyTiers(typeKey);
   if (!oldTierStillHasCards && !visibleEmptyTiers.has(oldTier)) {
-    visibleEmptyTiers.add(oldTier);
+  addVisibleEmptyTier(typeKey, oldTier);
   }
   
   // Determine insertion position
@@ -1576,6 +1585,17 @@ function removeTier(tier) {
     if (camp === 'lores') entries = campaignLoresEntries;
     else if (camp === 'guildvox') entries = guildVoxEntries;
     else entries = fateEntries;
+  } else if (activeTab === 'base') {
+    // Base main tab contains its own sub-tabs (leaders, lore, basecourt)
+    const activeBase = Array.from(el.baseSubTabsButtons).find(b => b.classList.contains('active'));
+    const baseSub = activeBase ? activeBase.dataset.subtab : 'leaders';
+    if (baseSub === 'leaders') {
+      // Determine which leader player-count subtab is active (3p/4p)
+      const activeLeader = Array.from(el.leaderSubTabs.querySelectorAll('.sub-tab')).find(sb => sb.classList.contains('active'));
+      const leaderSub = activeLeader ? activeLeader.dataset.subtab : currentLeaderTab;
+      entries = leaderSub === '4p' ? leaderEntries4P : leaderEntries3P;
+    } else if (baseSub === 'lore') entries = loreEntries;
+    else if (baseSub === 'basecourt') entries = basecourtEntries;
   }
 
   let activeKey = activeTab;
@@ -1586,6 +1606,17 @@ function removeTier(tier) {
     const activeCamp = Array.from(el.campaignSubTabsButtons).find(b => b.classList.contains('active'));
     const camp = activeCamp ? activeCamp.dataset.subtab : 'fate';
     activeKey = camp === 'lores' ? 'campaign-lores' : (camp === 'guildvox' ? 'campaign-guildvox' : 'fate');
+  }
+  if (activeTab === 'base') {
+    const activeBase = Array.from(el.baseSubTabsButtons).find(b => b.classList.contains('active'));
+    const baseSub = activeBase ? activeBase.dataset.subtab : 'leaders';
+    if (baseSub === 'leaders') {
+      const activeLeader = Array.from(el.leaderSubTabs.querySelectorAll('.sub-tab')).find(sb => sb.classList.contains('active'));
+      const leaderSub = activeLeader ? activeLeader.dataset.subtab : currentLeaderTab;
+      activeKey = `leaders-${leaderSub}`;
+    } else {
+      activeKey = baseSub;
+    }
   }
   const visibleEmptyTiers = getVisibleEmptyTiers(activeKey);
   const hiddenTiers = getHiddenTiers(activeKey);
@@ -1715,7 +1746,7 @@ function toggleEditMode() {
     const hasNonUnranked = entries && entries.some(e => (e.tier || '').toUpperCase() !== 'UNRANKED');
     if (!entries || entries.length === 0 || !hasNonUnranked) {
       const autoTiers = ['S', 'A', 'B', 'C', 'D'];
-      for (const t of autoTiers) visibleEmpty.add(t);
+      for (const t of autoTiers) addVisibleEmptyTier(activeKey, t);
     }
   }
   rebuildCurrentView();
@@ -1803,7 +1834,7 @@ function clearTierList() {
         const visEmpty = getVisibleEmptyTiers(activeMainKey);
         const hid = getHiddenTiers(activeMainKey);
         visEmpty.clear(); hid.clear();
-        for (const t of ["S","A","B","C","D"]) visEmpty.add(t);
+        for (const t of ["S","A","B","C","D"]) addVisibleEmptyTier(activeMainKey, t);
         for (const t of ["SSS","SS","F"]) hid.add(t);
         rebuildCurrentView();
       });
@@ -1824,7 +1855,7 @@ function clearTierList() {
       const visEmptyF = getVisibleEmptyTiers(activeMainKeyF);
       const hidF = getHiddenTiers(activeMainKeyF);
       visEmptyF.clear(); hidF.clear();
-      for (const t of ["S","A","B","C","D"]) visEmptyF.add(t);
+      for (const t of ["S","A","B","C","D"]) addVisibleEmptyTier(activeMainKeyF, t);
       for (const t of ["SSS","SS","F"]) hidF.add(t);
       rebuildCurrentView();
       return;
@@ -1847,7 +1878,7 @@ function clearTierList() {
       const visEmpty = getVisibleEmptyTiers(activeMainKey);
       const hid = getHiddenTiers(activeMainKey);
       visEmpty.clear(); hid.clear();
-      for (const t of ["S","A","B","C","D"]) visEmpty.add(t);
+      for (const t of ["S","A","B","C","D"]) addVisibleEmptyTier(activeMainKey, t);
       for (const t of ["SSS","SS","F"]) hid.add(t);
       rebuildCurrentView();
       return;
@@ -1855,6 +1886,72 @@ function clearTierList() {
   }
   
   // Load cards from YAML in original order
+  // Special-case: if clearing the Base->Lore subtab, load only the base-game YAML
+  const activeTabEl = Array.from(el.tabs).find(tab => tab.classList.contains('active'));
+  const activeTabIsBase = activeTabEl && activeTabEl.dataset.tab === 'base';
+  if (activeTabIsBase) {
+    const activeBase = Array.from(el.baseSubTabsButtons).find(b => b.classList.contains('active'));
+    const baseSub = activeBase ? activeBase.dataset.subtab : 'leaders';
+    if (baseSub === 'lore' && targetType === 'lore') {
+      fetchText(CONFIG.cardsYamlUrl).then(text => {
+        const loadedCards = yaml.load(text);
+        if (!Array.isArray(loadedCards)) throw new Error('Invalid YAML format');
+        const cards = loadedCards.map((c) => ({
+          id: c.id ?? null,
+          name: c.name ?? "",
+          image: c.image ?? null,
+          tags: Array.isArray(c.tags) ? c.tags : [],
+          text: c.text ?? "",
+        }));
+        // Filter only lores from base YAML
+        const filteredCards = cards.filter(card => card.tags && card.tags.includes('Lore'));
+        // Sort by ID as in loadCardsFromYAML
+        filteredCards.sort((a, b) => {
+          const aMatch = a.id && a.id.match(/ARCS-(?:L|LEAD|BC)(\d+)/);
+          const bMatch = b.id && b.id.match(/ARCS-(?:L|LEAD|BC)(\d+)/);
+          const aNum = aMatch ? parseInt(aMatch[1]) : 0;
+          const bNum = bMatch ? parseInt(bMatch[1]) : 0;
+          return aNum - bNum;
+        });
+
+        // Clear existing entries and populate with base lores
+        targetEntries.length = 0;
+        for (const card of filteredCards) {
+          targetEntries.push({ name: card.name, tier: 'Unranked', card: card });
+        }
+
+        // Make sure only S-D tiers are visible as empty rows, hide others (for this active tab)
+        let activeMainKey;
+        if (activeTabIsBase) {
+          const activeBase2 = Array.from(el.baseSubTabsButtons).find(b => b.classList.contains('active'));
+          const baseSub2 = activeBase2 ? activeBase2.dataset.subtab : 'leaders';
+          if (baseSub2 === 'leaders') {
+            const activeLeader = Array.from(el.leaderSubTabs.querySelectorAll('.sub-tab')).find(sb => sb.classList.contains('active'));
+            const leaderSub = activeLeader ? activeLeader.dataset.subtab : (activeSubTab && activeSubTab.dataset ? activeSubTab.dataset.subtab : currentLeaderTab);
+            activeMainKey = `leaders-${leaderSub}`;
+          } else {
+            activeMainKey = baseSub2;
+          }
+        } else {
+          activeMainKey = activeTab ? activeTab.dataset.tab : 'leaders-3p';
+        }
+        const visEmpty = getVisibleEmptyTiers(activeMainKey);
+        const hid = getHiddenTiers(activeMainKey);
+        visEmpty.clear();
+        hid.clear();
+        // Show S, A, B, C, D as empty rows
+        const visibleTiers = ["S", "A", "B", "C", "D"];
+        for (const tier of visibleTiers) addVisibleEmptyTier(activeMainKey, tier);
+        // Hide SSS, SS, F
+        const hiddenTierList = ["SSS", "SS", "F"];
+        for (const tier of hiddenTierList) hid.add(tier);
+
+        rebuildCurrentView();
+      });
+      return;
+    }
+  }
+
   loadCardsFromYAML(targetType).then(cards => {
     // Clear existing entries
     targetEntries.length = 0;
@@ -1887,11 +1984,9 @@ function clearTierList() {
     const hid = getHiddenTiers(activeMainKey);
     visEmpty.clear();
     hid.clear();
-    // Show S, A, B, C, D as empty rows
+    // Show S, A, B, C, D as empty rows (add in canonical order)
     const visibleTiers = ["S", "A", "B", "C", "D"];
-    for (const tier of visibleTiers) {
-      visEmpty.add(tier);
-    }
+    for (const tier of visibleTiers) addVisibleEmptyTier(activeMainKey, tier);
     // Hide SSS, SS, F
     const hiddenTierList = ["SSS", "SS", "F"];
     for (const tier of hiddenTierList) {
@@ -2688,6 +2783,15 @@ function initDownload() {
       label = "basecourt";
     }
 
+    // If we're in edit mode, exit it first so the captured image looks clean
+    let _restoreEditMode = false;
+    if (editMode) {
+      _restoreEditMode = true;
+      toggleEditMode();
+      // Wait a couple of frames for DOM/layout to update
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    }
+
     el.downloadBtn.disabled = true;
     el.downloadBtn.textContent = "Capturing…";
 
@@ -2745,6 +2849,12 @@ function initDownload() {
     } finally {
       el.downloadBtn.disabled = false;
       el.downloadBtn.textContent = "\u2b07 Download PNG";
+      // Restore edit mode if we temporarily exited it for clean capture
+      if (_restoreEditMode) {
+        // Give a frame for button state to update before toggling back
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        toggleEditMode();
+      }
     }
   });
 }
