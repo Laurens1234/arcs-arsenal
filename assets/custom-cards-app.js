@@ -20,15 +20,25 @@ const BEYOND_NAMES = [
 const BEYOND_SET = new Set(BEYOND_NAMES.map(n => normalizeName(n)));
 
 function normalizeName(n) {
-  return (n || "").toLowerCase().replace(/[’‘]/g, "'").trim();
+  if (!n) return "";
+  // normalize curly quotes, lowercase, remove punctuation, collapse spaces
+  let s = String(n).toLowerCase();
+  s = s.replace(/[’‘]/g, "'");
+  // replace all non-alphanumeric characters (except spaces) with nothing
+  s = s.replace(/[^a-z0-9\s]/g, "");
+  // collapse multiple spaces
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
 }
 
 // ========== URL Sync ==========
 function setUrlTab(tab) {
   try {
-    const url = new URL(window.location.href);
-    url.searchParams.set("tab", tab);
-    history.replaceState(null, "", url.toString());
+    // Use pathname + search to avoid embedding auth/origin specifics
+    const path = window.location.pathname || "/";
+    const hash = window.location.hash || "";
+    const search = `?tab=${encodeURIComponent(tab)}`;
+    history.replaceState(null, "", `${path}${search}${hash}`);
   } catch (e) {
     // ignore URL errors
   }
