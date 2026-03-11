@@ -7,6 +7,42 @@ const LORE_PATH = "results/lore";
 
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}`;
 
+// ======= Beyond the Reach ========
+// Names of leaders to show when the "beyond" tab is active
+const BEYOND_NAMES = [
+  "God's Hand",
+  "Firebrand",
+  "Scavenger",
+  "Diplomat",
+  "Imperator",
+  "Ancient Wraith",
+];
+const BEYOND_SET = new Set(BEYOND_NAMES.map(n => normalizeName(n)));
+
+function normalizeName(n) {
+  return (n || "").toLowerCase().replace(/[’‘]/g, "'").trim();
+}
+
+// ========== URL Sync ==========
+function setUrlTab(tab) {
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    history.replaceState(null, "", url.toString());
+  } catch (e) {
+    // ignore URL errors
+  }
+}
+
+function getUrlTab() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("tab");
+  } catch (e) {
+    return null;
+  }
+}
+
 // ========== DOM ==========
 const el = {
   status: document.getElementById("status"),
@@ -108,6 +144,9 @@ function getFilteredCards() {
     cards = cards.filter((c) => c.type === "Leader");
   } else if (activeTab === "lore") {
     cards = cards.filter((c) => c.type === "Lore");
+  } else if (activeTab === "beyond") {
+    // Show only the specified leaders for the "Beyond the Reach" tab
+    cards = cards.filter((c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name)));
   }
 
   // Search filter
@@ -248,6 +287,56 @@ function printCards() {
   });
 }
 
+// ========== Download Images ==========
+async function downloadImages() {
+  const visible = getFilteredCards();
+  const cards = selectedCards.size > 0
+    ? visible.filter((c) => selectedCards.has(c.imageUrl))
+    : visible;
+  if (cards.length === 0) return;
+
+  el.status.textContent = "Preparing download…";
+
+  try {
+    const zip = new JSZip();
+    const folder = zip.folder("cards") || zip;
+
+    for (const card of cards) {
+      try {
+        const res = await fetch(card.imageUrl);
+        const blob = await res.blob();
+        const filename = card.filename || `${card.name.replace(/\s+/g, "_")}.png`;
+        folder.file(filename, blob);
+      } catch (err) {
+        console.error("Failed to fetch", card.imageUrl, err);
+      }
+    }
+
+    const content = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(content);
+    const a = document.createElement("a");
+    a.href = url;
+    function tabToFilename(tab) {
+      const map = {
+        leaders: "leaders.zip",
+        lore: "lore.zip",
+        all: "all_cards.zip",
+        beyond: "beyond-the-reach.zip",
+      };
+      return map[tab] || `${(tab || 'cards').replace(/\s+/g, '_')}.zip`;
+    }
+    a.download = tabToFilename(activeTab);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("Error creating ZIP", err);
+  } finally {
+    el.status.textContent = "";
+  }
+}
+
 // ========== Event Listeners ==========
 function init() {
   initTheme();
@@ -256,6 +345,9 @@ function init() {
 
   // Print
   document.getElementById("printBtn").addEventListener("click", printCards);
+  // Download
+  const downloadBtn = document.getElementById("downloadBtn");
+  if (downloadBtn) downloadBtn.addEventListener("click", downloadImages);
 
   // Select mode
   document.getElementById("selectBtn").addEventListener("click", toggleSelectMode);
@@ -268,9 +360,20 @@ function init() {
       el.tabs.forEach((t) => t.classList.remove("active"));
       tab.classList.add("active");
       activeTab = tab.dataset.tab;
+      // reflect tab in the URL
+      setUrlTab(activeTab);
       render();
     });
   });
+
+  // Read tab from URL if present and valid
+  const initialUrlTab = getUrlTab();
+  const validTabs = ["leaders", "lore", "all", "beyond"];
+  if (initialUrlTab && validTabs.includes(initialUrlTab)) {
+    activeTab = initialUrlTab;
+    // update active class on tab buttons
+    el.tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === activeTab));
+  }
 
   // Search
   el.query.addEventListener("input", render);

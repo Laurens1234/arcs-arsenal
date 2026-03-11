@@ -55,6 +55,7 @@
           <button class="tab active" data-tab="leaders">Leaders</button>
           <button class="tab" data-tab="lore">Lore</button>
           <button class="tab" data-tab="all">All</button>
+          <button class="tab" data-tab="beyond">Beyond the Reach</button>
         </div>
         <div class="controls">
           <input id="query" type="search" class="search" placeholder="Search…" />
@@ -64,6 +65,7 @@
             <button id="deselectAllBtn" class="btn-compare" style="padding:8px 10px;font-size:0.8rem">None</button>
             <span id="selectionCount" style="font-size:0.8rem;color:var(--text-muted)"></span>
           </span>
+          <button id="downloadBtn" class="btn-compare">↓ Download All</button>
           <button id="printBtn" class="btn-compare">🖨 Print All</button>
           <a href="./index" class="btn-compare">← Home</a>
         </div>
@@ -94,6 +96,9 @@
         <p><a href="./tierlist">My Tier List</a> · <a href="./data">Data Arsenal</a> · <a href="./draft">Draft Helper</a> · <a href="./dice">Dice Calculator</a> · <a href="./custom-cards">Custom Cards</a> · <a href="./index">Home</a></p>
       </div>
     </footer>
+
+    <!-- JSZip for creating ZIP archives of images in-browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
 
     <script type="module" src="./assets/custom-cards-app.js"></script>
   </body>
