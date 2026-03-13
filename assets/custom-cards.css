@@ -1,7 +1,8 @@
 /* ========== Custom Cards Page Styles ========== */
 
 /* Make the generator link in the header tagline clearly look like a link */
-.tagline a.generator-link {
+.tagline a.generator-link,
+.tagline a.workshop-leader-link {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
