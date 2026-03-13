@@ -1,5 +1,11 @@
 /* ========== Custom Cards Page Styles ========== */
 
+/* Make the generator link in the header tagline clearly look like a link */
+.tagline a.generator-link {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Type badge on cards */
 .gen-card-type-badge {
   position: absolute;

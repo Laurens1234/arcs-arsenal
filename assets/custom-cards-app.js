@@ -151,7 +151,10 @@ function getFilteredCards() {
 
   // Tab filter
   if (activeTab === "leaders") {
-    cards = cards.filter((c) => c.type === "Leader");
+    // Regular leaders tab should NOT include the Beyond the Reach leader set
+    cards = cards.filter(
+      (c) => c.type === "Leader" && !BEYOND_SET.has(normalizeName(c.name))
+    );
   } else if (activeTab === "lore") {
     cards = cards.filter((c) => c.type === "Lore");
   } else if (activeTab === "beyond") {
