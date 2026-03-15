@@ -59,6 +59,7 @@ const el = {
   cardGrid: document.getElementById("cardGrid"),
   query: document.getElementById("query"),
   tabs: document.querySelectorAll(".tab"),
+  sortSelect: document.getElementById("sortSelect"),
   themeToggle: document.getElementById("themeToggle"),
   lightbox: document.getElementById("lightbox"),
   lightboxImg: document.getElementById("lightboxImg"),
@@ -71,6 +72,8 @@ let allCards = [];
 let activeTab = "leaders";
 let selectMode = false;
 let selectedCards = new Set(); // stores card imageUrl as unique key
+
+let leaderOrderByName = new Map(); // key: normalizeName(leaderName) -> number (1-based)
 
 // ========== Theme ==========
 function initTheme() {
@@ -109,6 +112,11 @@ async function loadCards() {
   el.status.textContent = "Loading cards from GitHub…";
 
   try {
+    // Load leader ordering metadata in the background; don't block image list.
+    loadLeaderOrderMap().then(() => {
+      if (activeTab === "leaders" && getLeaderSortMode() === "number") render();
+    });
+
     const [leaderFiles, loreFiles] = await Promise.all([
       fetchGitHubDir(LEADERS_PATH),
       fetchGitHubDir(LORE_PATH),
@@ -145,6 +153,52 @@ async function loadCards() {
   }
 }
 
+async function loadLeaderOrderMap() {
+  // The generator repo contains an ordered Python list of leader objects.
+  // We use that list order as the leader "card number" shown on the card.
+  // If this fetch fails, sorting by number will gracefully fall back.
+  const urls = [`${RAW_BASE}/scripts/leadersFormatted.py`];
+
+  const texts = await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return "";
+        return await res.text();
+      } catch (e) {
+        return "";
+      }
+    })
+  );
+
+  const nextMap = new Map();
+  let nextNumber = 1;
+  const nameRe = /"name"\s*:\s*"([^"]+)"/g;
+
+  for (const text of texts) {
+    if (!text) continue;
+    let match;
+    while ((match = nameRe.exec(text))) {
+      const name = match[1];
+      const key = normalizeName(name);
+      if (!key) continue;
+      if (nextMap.has(key)) continue;
+      nextMap.set(key, nextNumber++);
+    }
+  }
+
+  leaderOrderByName = nextMap;
+}
+
+function getLeaderSortMode() {
+  return el.sortSelect?.value || "name";
+}
+
+function updateSortControlVisibility() {
+  if (!el.sortSelect) return;
+  el.sortSelect.style.display = activeTab === "leaders" ? "" : "none";
+}
+
 // ========== Rendering ==========
 function getFilteredCards() {
   let cards = allCards;
@@ -166,6 +220,19 @@ function getFilteredCards() {
   const q = (el.query.value || "").trim().toLowerCase();
   if (q) {
     cards = cards.filter((c) => c.name.toLowerCase().includes(q));
+  }
+
+  // Sorting (leaders tab only)
+  if (activeTab === "leaders") {
+    const sortMode = getLeaderSortMode();
+    if (sortMode === "number") {
+      cards = [...cards].sort((a, b) => {
+        const aNum = leaderOrderByName.get(normalizeName(a.name)) ?? Number.POSITIVE_INFINITY;
+        const bNum = leaderOrderByName.get(normalizeName(b.name)) ?? Number.POSITIVE_INFINITY;
+        if (aNum !== bNum) return aNum - bNum;
+        return a.name.localeCompare(b.name);
+      });
+    }
   }
 
   return cards;
@@ -375,6 +442,7 @@ function init() {
       activeTab = tab.dataset.tab;
       // reflect tab in the URL
       setUrlTab(activeTab);
+      updateSortControlVisibility();
       render();
     });
   });
@@ -386,6 +454,15 @@ function init() {
     activeTab = initialUrlTab;
     // update active class on tab buttons
     el.tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === activeTab));
+  }
+
+  updateSortControlVisibility();
+
+  // Sort
+  if (el.sortSelect) {
+    el.sortSelect.addEventListener("change", () => {
+      render();
+    });
   }
 
   // Search

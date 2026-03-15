@@ -59,6 +59,10 @@
         </div>
         <div class="controls">
           <input id="query" type="search" class="search" placeholder="Search…" />
+          <select id="sortSelect" class="select" aria-label="Order leaders" style="display:none">
+            <option value="number" selected>Order: Card #</option>
+            <option value="name">Order: Name</option>
+          </select>
           <button id="selectBtn" class="btn-compare">☑ Select</button>
           <span id="selectActions" style="display:none;gap:6px;align-items:center">
             <button id="selectAllBtn" class="btn-compare" style="padding:8px 10px;font-size:0.8rem">All</button>
