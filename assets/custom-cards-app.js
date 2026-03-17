@@ -65,6 +65,9 @@ const el = {
   themeToggle: document.getElementById("themeToggle"),
   lightbox: document.getElementById("lightbox"),
   lightboxImg: document.getElementById("lightboxImg"),
+  lightboxTitle: document.getElementById("lightboxTitle"),
+  lightboxMeta: document.getElementById("lightboxMeta"),
+  lightboxAbilities: document.getElementById("lightboxAbilities"),
   lightboxClose: document.querySelector(".lightbox-close"),
   lightboxBackdrop: document.querySelector(".lightbox-backdrop"),
 };
@@ -74,12 +77,16 @@ let allCards = [];
 let activeTab = "leaders";
 let selectMode = false;
 let selectedCards = new Set(); // stores card imageUrl as unique key
+let currentLightboxCard = null;
 
 let leaderOrderByName = new Map(); // key: normalizeName(leaderName) -> number (1-based)
 let leaderAbilityCharsByName = new Map(); // key: normalizeName(leaderName) -> number (chars in ability names + text)
+let leaderAbilityTextByName = new Map(); // key: normalizeName(leaderName) -> string (combined abilities text)
 let leaderResourcesByName = new Map(); // key: normalizeName(leaderName) -> Set<string>
+let leaderResourceListByName = new Map(); // key: normalizeName(leaderName) -> string[] (ordered)
 let leaderHasTwoSameResourceByName = new Map(); // key: normalizeName(leaderName) -> boolean
 let leaderSetupFootprintByName = new Map(); // key: normalizeName(leaderName) -> string (e.g. "3-3-2|CS-")
+let leaderMetadataLoaded = false;
 
 // ========== Theme ==========
 function initTheme() {
@@ -122,6 +129,9 @@ async function loadCards() {
     loadLeaderMetadata().then(() => {
       // Counts for the resource dropdown also depend on this metadata.
       if (activeTab !== "leaders" && activeTab !== "beyond") return;
+      if (!el.lightbox.classList.contains("hidden") && currentLightboxCard) {
+        updateLightboxDetails(currentLightboxCard);
+      }
       render();
     });
 
@@ -286,129 +296,182 @@ function computeAbilityCharCount(abilitiesCombinedText) {
 }
 
 async function loadLeaderMetadata() {
-  // The generator repo contains an ordered Python list of leader objects.
-  // We use that list order as the leader "card number" shown on the card,
-  // and we also parse ability text to support sorting by ability length.
-  const url = `${RAW_BASE}/scripts/leadersFormatted.py`;
+  const urls = {
+    leaders: `${RAW_BASE}/scripts/leadersFormatted.py`,
+    btr: `${RAW_BASE}/scripts/btrFormatted.py`,
+  };
 
-  let text = "";
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return;
-    text = await res.text();
-  } catch (e) {
-    return;
-  }
-  if (!text) return;
-
-  // 1) Card number order (first occurrence wins)
-  const nextOrderMap = new Map();
-  let nextNumber = 1;
-  const nameRe = /"name"\s*:\s*"([^"]+)"/g;
-  let match;
-  while ((match = nameRe.exec(text))) {
-    const name = match[1];
-    const key = normalizeName(name);
-    if (!key) continue;
-    if (nextOrderMap.has(key)) continue;
-    nextOrderMap.set(key, nextNumber++);
+  async function safeFetchText(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return "";
+      return await res.text();
+    } catch (e) {
+      return "";
+    }
   }
 
-  // 2) Ability char counts (first occurrence wins)
-  const nameMatches = [];
-  nameRe.lastIndex = 0;
-  while ((match = nameRe.exec(text))) {
-    nameMatches.push({ name: match[1], index: match.index });
-  }
+  function parseInto(text, opts) {
+    const {
+      includeKey = () => true,
+      overwrite = false,
+      writeOrder = false,
+      orderCounter = { value: 1 },
+      orderMap,
+      abilityCharsMap,
+      abilityTextMap,
+      resourcesMap,
+      resourceListMap,
+      twoSameMap,
+      setupMap,
+    } = opts;
 
-  const nextAbilityMap = new Map();
-  const nextResourcesMap = new Map();
-  const nextTwoSameMap = new Map();
-  const nextSetupMap = new Map();
-  for (let i = 0; i < nameMatches.length; i++) {
-    const { name, index } = nameMatches[i];
-    const key = normalizeName(name);
-    if (!key) continue;
+    if (!text) return;
 
-    const nextIndex = i + 1 < nameMatches.length ? nameMatches[i + 1].index : text.length;
-    const slice = text.slice(index, nextIndex);
+    const nameRe = /"name"\s*:\s*"([^"]+)"/g;
+    const nameMatches = [];
+    let match;
+    while ((match = nameRe.exec(text))) {
+      const name = match[1];
+      const key = normalizeName(name);
+      if (!key) continue;
+      if (!includeKey(key)) continue;
+      if (writeOrder && !orderMap.has(key)) {
+        orderMap.set(key, orderCounter.value++);
+      }
+      nameMatches.push({ name, key, index: match.index });
+    }
 
-    // abilities
-    if (!nextAbilityMap.has(key)) {
-      const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
-      if (abilitiesKeyIndex !== -1) {
-        const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
-        if (openParenIndex !== -1) {
-          const closeParenIndex = findMatchingParen(slice, openParenIndex);
-          if (closeParenIndex !== -1) {
-            const inside = slice.slice(openParenIndex + 1, closeParenIndex);
-            const pieces = extractDoubleQuotedStrings(inside);
-            if (pieces.length) {
-              const combined = pieces.join("");
-              const totalChars = computeAbilityCharCount(combined);
-              nextAbilityMap.set(key, totalChars);
+    for (let i = 0; i < nameMatches.length; i++) {
+      const { key, index } = nameMatches[i];
+      const nextIndex = i + 1 < nameMatches.length ? nameMatches[i + 1].index : text.length;
+      const slice = text.slice(index, nextIndex);
+
+      // abilities
+      if (overwrite || !abilityCharsMap.has(key) || !abilityTextMap.has(key)) {
+        const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
+        if (abilitiesKeyIndex !== -1) {
+          const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
+          if (openParenIndex !== -1) {
+            const closeParenIndex = findMatchingParen(slice, openParenIndex);
+            if (closeParenIndex !== -1) {
+              const inside = slice.slice(openParenIndex + 1, closeParenIndex);
+              const pieces = extractDoubleQuotedStrings(inside);
+              if (pieces.length) {
+                const combined = pieces.join("");
+                abilityTextMap.set(key, combined);
+                abilityCharsMap.set(key, computeAbilityCharCount(combined));
+              }
             }
           }
         }
       }
-    }
 
-    // resources
-    if (!nextResourcesMap.has(key)) {
-      const resMatch = slice.match(/"resources"\s*:\s*\[([^\]]*)\]/);
-      if (resMatch && resMatch[1] !== undefined) {
-        const items = extractDoubleQuotedStrings(resMatch[1]);
-        const cleaned = items.map((s) => stripMarkdownForCharCount(s)).filter(Boolean);
-        const set = new Set(cleaned);
-        if (set.size) nextResourcesMap.set(key, set);
-
-        if (!nextTwoSameMap.has(key) && cleaned.length >= 2) {
-          nextTwoSameMap.set(key, cleaned[0] === cleaned[1]);
+      // resources
+      if (overwrite || !resourcesMap.has(key) || !resourceListMap.has(key)) {
+        const resMatch = slice.match(/"resources"\s*:\s*\[([^\]]*)\]/);
+        if (resMatch && resMatch[1] !== undefined) {
+          const items = extractDoubleQuotedStrings(resMatch[1]);
+          const cleaned = items.map((s) => stripMarkdownForCharCount(s)).filter(Boolean);
+          const set = new Set(cleaned);
+          if (set.size) {
+            resourcesMap.set(key, set);
+            resourceListMap.set(key, cleaned);
+          }
+          if (cleaned.length >= 2) {
+            twoSameMap.set(key, cleaned[0] === cleaned[1]);
+          }
         }
       }
-    }
 
-    // setup footprint
-    if (!nextSetupMap.has(key)) {
-      const setupMatch = slice.match(/"setup"\s*:\s*\{([\s\S]*?)\}\s*,?\s*(?:"body_font_size"|\}|$)/);
-      const setupText = setupMatch ? setupMatch[1] : "";
-      if (setupText) {
-        function readSlot(slot) {
-          // Capture ships + building within the slot dict.
-          const slotRe = new RegExp(`"${slot}"\\s*:\\s*\\{[\\s\\S]*?"ships"\\s*:\\s*(\\d+)[\\s\\S]*?"building"\\s*:\\s*"([^\"]+)"`, "m");
-          const m = setupText.match(slotRe);
-          if (!m) return null;
-          const ships = parseInt(m[1], 10);
-          const buildingRaw = stripMarkdownForCharCount(m[2]);
-          const building = (buildingRaw || "").toLowerCase();
-          return { ships: Number.isFinite(ships) ? ships : 0, building };
-        }
-
-        const a = readSlot("A");
-        const b = readSlot("B");
-        const c = readSlot("C");
-        if (a && b && c) {
-          const shipsPattern = `${a.ships}-${b.ships}-${c.ships}`;
-          function bldChar(bld) {
-            if (bld === "city") return "C";
-            if (bld === "starport") return "S";
-            return "-";
+      // setup footprint
+      if (overwrite || !setupMap.has(key)) {
+        const setupMatch = slice.match(/"setup"\s*:\s*\{([\s\S]*?)\}\s*,?\s*(?:"body_font_size"|\}|$)/);
+        const setupText = setupMatch ? setupMatch[1] : "";
+        if (setupText) {
+          function readSlot(slot) {
+            const slotRe = new RegExp(`"${slot}"\\s*:\\s*\\{[\\s\\S]*?"ships"\\s*:\\s*(\\d+)[\\s\\S]*?"building"\\s*:\\s*"([^\"]+)"`, "m");
+            const m = setupText.match(slotRe);
+            if (!m) return null;
+            const ships = parseInt(m[1], 10);
+            const buildingRaw = stripMarkdownForCharCount(m[2]);
+            const building = (buildingRaw || "").toLowerCase();
+            return { ships: Number.isFinite(ships) ? ships : 0, building };
           }
-          const buildingsPattern3 = `${bldChar(a.building)}${bldChar(b.building)}${bldChar(c.building)}`;
-          const buildingsPattern = buildingsPattern3.endsWith("-")
-            ? buildingsPattern3.slice(0, -1)
-            : buildingsPattern3;
-          nextSetupMap.set(key, `${shipsPattern}|${buildingsPattern}`);
+
+          const a = readSlot("A");
+          const b = readSlot("B");
+          const c = readSlot("C");
+          if (a && b && c) {
+            const shipsPattern = `${a.ships}-${b.ships}-${c.ships}`;
+            function bldChar(bld) {
+              if (bld === "city") return "C";
+              if (bld === "starport") return "S";
+              return "-";
+            }
+            const buildingsPattern3 = `${bldChar(a.building)}${bldChar(b.building)}${bldChar(c.building)}`;
+            const buildingsPattern = buildingsPattern3.endsWith("-")
+              ? buildingsPattern3.slice(0, -1)
+              : buildingsPattern3;
+            setupMap.set(key, `${shipsPattern}|${buildingsPattern}`);
+          }
         }
       }
     }
   }
 
+  const [leadersText, btrText] = await Promise.all([
+    safeFetchText(urls.leaders),
+    safeFetchText(urls.btr),
+  ]);
+
+  const nextOrderMap = new Map();
+  const nextAbilityMap = new Map();
+  const nextAbilityTextMap = new Map();
+  const nextResourcesMap = new Map();
+  const nextResourceListMap = new Map();
+  const nextTwoSameMap = new Map();
+  const nextSetupMap = new Map();
+  const orderCounter = { value: 1 };
+
+  // Regular leaders use leadersFormatted.py
+  parseInto(leadersText, {
+    includeKey: (k) => !BEYOND_SET.has(k),
+    overwrite: false,
+    writeOrder: true,
+    orderCounter,
+    orderMap: nextOrderMap,
+    abilityCharsMap: nextAbilityMap,
+    abilityTextMap: nextAbilityTextMap,
+    resourcesMap: nextResourcesMap,
+    resourceListMap: nextResourceListMap,
+    twoSameMap: nextTwoSameMap,
+    setupMap: nextSetupMap,
+  });
+
+  // Beyond the Reach leaders use btrFormatted.py
+  parseInto(btrText, {
+    includeKey: (k) => BEYOND_SET.has(k),
+    overwrite: true,
+    writeOrder: false,
+    orderCounter,
+    orderMap: nextOrderMap,
+    abilityCharsMap: nextAbilityMap,
+    abilityTextMap: nextAbilityTextMap,
+    resourcesMap: nextResourcesMap,
+    resourceListMap: nextResourceListMap,
+    twoSameMap: nextTwoSameMap,
+    setupMap: nextSetupMap,
+  });
+
   leaderOrderByName = nextOrderMap;
   leaderAbilityCharsByName = nextAbilityMap;
+  leaderAbilityTextByName = nextAbilityTextMap;
   leaderResourcesByName = nextResourcesMap;
+  leaderResourceListByName = nextResourceListMap;
   leaderHasTwoSameResourceByName = nextTwoSameMap;
   leaderSetupFootprintByName = nextSetupMap;
+  leaderMetadataLoaded = true;
 }
 
 function getLeaderSortMode() {
@@ -667,9 +730,113 @@ function render() {
 }
 
 // ========== Lightbox ==========
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function renderInlineMarkdownToHtml(s) {
+  // Minimal markdown support used by the generator output.
+  // Safe because we escape first.
+  const escaped = escapeHtml(s);
+  return escaped
+    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+}
+
+function parseAbilitySections(abilitiesCombinedText) {
+  const text = String(abilitiesCombinedText || "");
+  const headerRe = /(?:^|\n)\s*\*([^*]+?)\.\*\s*/g;
+  const matches = [];
+  let m;
+  while ((m = headerRe.exec(text))) {
+    matches.push({
+      name: (m[1] || "").trim(),
+      start: m.index,
+      contentStart: headerRe.lastIndex,
+    });
+  }
+
+  if (matches.length === 0) {
+    const body = text.trim();
+    return body ? [{ name: "", body }] : [];
+  }
+
+  const sections = [];
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const next = matches[i + 1];
+    const body = text.slice(cur.contentStart, next ? next.start : text.length).trim();
+    sections.push({ name: cur.name, body });
+  }
+  return sections;
+}
+
+function clearLightboxDetails() {
+  if (el.lightboxTitle) el.lightboxTitle.textContent = "";
+  if (el.lightboxMeta) el.lightboxMeta.textContent = "";
+  if (el.lightboxAbilities) el.lightboxAbilities.innerHTML = "";
+}
+
+function updateLightboxDetails(card) {
+  if (!card) {
+    clearLightboxDetails();
+    return;
+  }
+
+  if (el.lightboxTitle) el.lightboxTitle.textContent = card.name || "";
+
+  if (card.type !== "Leader") {
+    if (el.lightboxMeta) el.lightboxMeta.textContent = "";
+    if (el.lightboxAbilities) el.lightboxAbilities.innerHTML = "";
+    return;
+  }
+
+  const key = normalizeName(card.name);
+  const resources = leaderResourceListByName.get(key) || [];
+  const setupKey = leaderSetupFootprintByName.get(key) || "";
+
+  const metaParts = [];
+  if (resources.length) metaParts.push(`Resources: ${resources.join(", ")}`);
+  if (setupKey) metaParts.push(`Setup: ${formatSetupFootprintLabel(setupKey)}`);
+  if (el.lightboxMeta) el.lightboxMeta.textContent = metaParts.join(" · ");
+
+  const abilitiesText = leaderAbilityTextByName.get(key);
+  if (!el.lightboxAbilities) return;
+
+  if (!abilitiesText) {
+    if (!leaderMetadataLoaded) {
+      el.lightboxAbilities.innerHTML = `<div class="lightbox-ability"><div class="lightbox-ability-body">Loading details…</div></div>`;
+    } else {
+      el.lightboxAbilities.innerHTML = `<div class="lightbox-ability"><div class="lightbox-ability-body">No ability text found.</div></div>`;
+    }
+    return;
+  }
+
+  const sections = parseAbilitySections(abilitiesText);
+  if (sections.length === 0) {
+    el.lightboxAbilities.innerHTML = `<div class="lightbox-ability"><div class="lightbox-ability-body">No ability text found.</div></div>`;
+    return;
+  }
+
+  el.lightboxAbilities.innerHTML = sections
+    .map(({ name, body }) => {
+      const nameHtml = name ? `<div class="lightbox-ability-name">${escapeHtml(name)}</div>` : "";
+      const bodyHtml = renderInlineMarkdownToHtml(body).replace(/\n/g, "<br>");
+      return `<div class="lightbox-ability">${nameHtml}<div class="lightbox-ability-body">${bodyHtml}</div></div>`;
+    })
+    .join("");
+}
+
 function openLightbox(card) {
+  currentLightboxCard = card;
   el.lightboxImg.src = card.imageUrl;
   el.lightboxImg.alt = card.name;
+  updateLightboxDetails(card);
   el.lightbox.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -677,6 +844,8 @@ function openLightbox(card) {
 function closeLightbox() {
   el.lightbox.classList.add("hidden");
   el.lightboxImg.src = "";
+  currentLightboxCard = null;
+  clearLightboxDetails();
   document.body.style.overflow = "";
 }
 

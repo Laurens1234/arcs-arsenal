@@ -1,5 +1,9 @@
 /* ========== Custom Cards Page Styles ========== */
 
+html {
+  overflow-x: hidden;
+}
+
 /* Make the generator link in the header tagline clearly look like a link */
 .tagline a.generator-link,
 .tagline a.workshop-leader-link {
@@ -60,14 +64,82 @@
   max-width: 90vw;
   max-height: 90vh;
   animation: fadeInUp 0.3s ease-out;
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  overflow: hidden;
 }
 
 .lightbox-content img {
   max-width: 100%;
-  max-height: 85vh;
+  max-height: 90vh;
+  max-width: 62vw;
   border-radius: var(--radius);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   object-fit: contain;
+}
+
+.lightbox-details {
+  border: 1px solid var(--border);
+  background: var(--bg-solid);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  overflow: auto;
+  max-height: 90vh;
+  width: clamp(280px, 28vw, 460px);
+}
+
+@media (max-width: 900px) {
+  .lightbox-content {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lightbox-content img {
+    max-width: 100%;
+    max-height: 70vh;
+  }
+
+  .lightbox-details {
+    width: auto;
+    max-height: 40vh;
+  }
+}
+
+.lightbox-title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.lightbox-meta {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.lightbox-abilities {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lightbox-ability {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.lightbox-ability-name {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.lightbox-ability-body {
+  color: var(--text);
+  line-height: 1.35;
 }
 
 .lightbox-close {
@@ -98,6 +170,46 @@
 /* Custom Cards page: simpler card-info (no stats) */
 .card-info {
   /* Inherits from main style.css */
+}
+
+/* Custom Cards: mobile grid should fill width (many controls above can make the grid feel cramped) */
+@media (max-width: 640px) {
+  .controls {
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow: visible;
+  }
+
+  .controls > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #selectActions {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
+  .nav .container,
+  .main .container {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .nav .container,
+  .main .container {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
 }
 
 /* ========== Selection Mode ========== */
