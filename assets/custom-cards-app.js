@@ -74,6 +74,7 @@ let selectMode = false;
 let selectedCards = new Set(); // stores card imageUrl as unique key
 
 let leaderOrderByName = new Map(); // key: normalizeName(leaderName) -> number (1-based)
+let leaderAbilityCharsByName = new Map(); // key: normalizeName(leaderName) -> number (chars in ability names + text)
 
 // ========== Theme ==========
 function initTheme() {
@@ -113,8 +114,10 @@ async function loadCards() {
 
   try {
     // Load leader ordering metadata in the background; don't block image list.
-    loadLeaderOrderMap().then(() => {
-      if (activeTab === "leaders" && getLeaderSortMode() === "number") render();
+    loadLeaderMetadata().then(() => {
+      if (activeTab !== "leaders") return;
+      const sortMode = getLeaderSortMode();
+      if (sortMode === "number" || sortMode === "abilityCharsAsc" || sortMode === "abilityCharsDesc") render();
     });
 
     const [leaderFiles, loreFiles] = await Promise.all([
@@ -154,40 +157,192 @@ async function loadCards() {
 }
 
 async function loadLeaderOrderMap() {
-  // The generator repo contains an ordered Python list of leader objects.
-  // We use that list order as the leader "card number" shown on the card.
-  // If this fetch fails, sorting by number will gracefully fall back.
-  const urls = [`${RAW_BASE}/scripts/leadersFormatted.py`];
+  // Deprecated: kept for backwards compatibility; metadata is loaded via loadLeaderMetadata().
+  await loadLeaderMetadata();
+}
 
-  const texts = await Promise.all(
-    urls.map(async (url) => {
-      try {
-        const res = await fetch(url);
-        if (!res.ok) return "";
-        return await res.text();
-      } catch (e) {
-        return "";
+function decodeBackslashEscapes(s) {
+  // Decode only the escapes we expect to see in this generated file.
+  // Leave any unknown escapes as-is.
+  return String(s)
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, "\t")
+    .replace(/\\r/g, "\r")
+    .replace(/\\\"/g, '"')
+    .replace(/\\\\/g, "\\");
+}
+
+function stripMarkdownForCharCount(s) {
+  return String(s)
+    // Remove markdown markers commonly used in ability text.
+    .replace(/\*\*|\*/g, "")
+    // Collapse whitespace to approximate visible character count.
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractDoubleQuotedStrings(source) {
+  // Extracts the contents of all double-quoted string literals in `source`.
+  // Handles escaped quotes/backslashes, and allows literal newlines.
+  const strings = [];
+  let i = 0;
+  while (i < source.length) {
+    if (source[i] !== '"') {
+      i++;
+      continue;
+    }
+    i++; // skip opening quote
+    let buf = "";
+    while (i < source.length) {
+      const ch = source[i];
+      if (ch === "\\") {
+        // Keep escape sequences intact for later decode.
+        if (i + 1 < source.length) {
+          buf += ch + source[i + 1];
+          i += 2;
+          continue;
+        }
+        buf += ch;
+        i++;
+        continue;
       }
-    })
-  );
+      if (ch === '"') {
+        i++; // closing quote
+        break;
+      }
+      buf += ch;
+      i++;
+    }
+    strings.push(decodeBackslashEscapes(buf));
+  }
+  return strings;
+}
 
-  const nextMap = new Map();
-  let nextNumber = 1;
-  const nameRe = /"name"\s*:\s*"([^"]+)"/g;
-
-  for (const text of texts) {
-    if (!text) continue;
-    let match;
-    while ((match = nameRe.exec(text))) {
-      const name = match[1];
-      const key = normalizeName(name);
-      if (!key) continue;
-      if (nextMap.has(key)) continue;
-      nextMap.set(key, nextNumber++);
+function findMatchingParen(text, openParenIndex) {
+  // Finds the matching ')' for the '(' at openParenIndex, skipping parentheses inside strings.
+  let depth = 0;
+  let inString = false;
+  for (let i = openParenIndex; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (ch === "\\") {
+        i++; // skip escaped char
+        continue;
+      }
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "(") {
+      depth++;
+      continue;
+    }
+    if (ch === ")") {
+      depth--;
+      if (depth === 0) return i;
     }
   }
+  return -1;
+}
 
-  leaderOrderByName = nextMap;
+function computeAbilityCharCount(abilitiesCombinedText) {
+  const text = String(abilitiesCombinedText || "");
+  // Ability headers look like: *Blitzing.* (italic name + dot)
+  const headerRe = /(?:^|\n)\s*\*([^*]+?)\.\*\s*/g;
+  const matches = [];
+  let m;
+  while ((m = headerRe.exec(text))) {
+    matches.push({
+      name: m[1] || "",
+      start: m.index,
+      contentStart: headerRe.lastIndex,
+    });
+  }
+
+  // If we can't detect headers, fall back to counting everything as text.
+  if (matches.length === 0) {
+    const visible = stripMarkdownForCharCount(text);
+    return visible.length;
+  }
+
+  let total = 0;
+  for (let i = 0; i < matches.length; i++) {
+    const cur = matches[i];
+    const next = matches[i + 1];
+    const rawName = stripMarkdownForCharCount(cur.name);
+    const body = text.slice(cur.contentStart, next ? next.start : text.length);
+    const rawBody = stripMarkdownForCharCount(body);
+    total += rawName.length + rawBody.length;
+  }
+  return total;
+}
+
+async function loadLeaderMetadata() {
+  // The generator repo contains an ordered Python list of leader objects.
+  // We use that list order as the leader "card number" shown on the card,
+  // and we also parse ability text to support sorting by ability length.
+  const url = `${RAW_BASE}/scripts/leadersFormatted.py`;
+
+  let text = "";
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return;
+    text = await res.text();
+  } catch (e) {
+    return;
+  }
+  if (!text) return;
+
+  // 1) Card number order (first occurrence wins)
+  const nextOrderMap = new Map();
+  let nextNumber = 1;
+  const nameRe = /"name"\s*:\s*"([^"]+)"/g;
+  let match;
+  while ((match = nameRe.exec(text))) {
+    const name = match[1];
+    const key = normalizeName(name);
+    if (!key) continue;
+    if (nextOrderMap.has(key)) continue;
+    nextOrderMap.set(key, nextNumber++);
+  }
+
+  // 2) Ability char counts (first occurrence wins)
+  const nameMatches = [];
+  nameRe.lastIndex = 0;
+  while ((match = nameRe.exec(text))) {
+    nameMatches.push({ name: match[1], index: match.index });
+  }
+
+  const nextAbilityMap = new Map();
+  for (let i = 0; i < nameMatches.length; i++) {
+    const { name, index } = nameMatches[i];
+    const key = normalizeName(name);
+    if (!key || nextAbilityMap.has(key)) continue;
+
+    const nextIndex = i + 1 < nameMatches.length ? nameMatches[i + 1].index : text.length;
+    const slice = text.slice(index, nextIndex);
+
+    const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
+    if (abilitiesKeyIndex === -1) continue;
+
+    const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
+    if (openParenIndex === -1) continue;
+    const closeParenIndex = findMatchingParen(slice, openParenIndex);
+    if (closeParenIndex === -1) continue;
+
+    const inside = slice.slice(openParenIndex + 1, closeParenIndex);
+    const pieces = extractDoubleQuotedStrings(inside);
+    if (!pieces.length) continue;
+    const combined = pieces.join("");
+    const totalChars = computeAbilityCharCount(combined);
+    nextAbilityMap.set(key, totalChars);
+  }
+
+  leaderOrderByName = nextOrderMap;
+  leaderAbilityCharsByName = nextAbilityMap;
 }
 
 function getLeaderSortMode() {
@@ -230,6 +385,21 @@ function getFilteredCards() {
         const aNum = leaderOrderByName.get(normalizeName(a.name)) ?? Number.POSITIVE_INFINITY;
         const bNum = leaderOrderByName.get(normalizeName(b.name)) ?? Number.POSITIVE_INFINITY;
         if (aNum !== bNum) return aNum - bNum;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sortMode === "abilityCharsAsc" || sortMode === "abilityCharsDesc") {
+      const dir = sortMode === "abilityCharsAsc" ? 1 : -1;
+      cards = [...cards].sort((a, b) => {
+        // Put leaders with unknown counts at the end.
+        const aChars = leaderAbilityCharsByName.get(normalizeName(a.name));
+        const bChars = leaderAbilityCharsByName.get(normalizeName(b.name));
+
+        const aKnown = Number.isFinite(aChars);
+        const bKnown = Number.isFinite(bChars);
+        if (aKnown !== bKnown) return aKnown ? -1 : 1;
+        if (!aKnown && !bKnown) return a.name.localeCompare(b.name);
+
+        if (aChars !== bChars) return (aChars - bChars) * dir;
         return a.name.localeCompare(b.name);
       });
     }
