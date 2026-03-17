@@ -60,6 +60,7 @@ const el = {
   query: document.getElementById("query"),
   tabs: document.querySelectorAll(".tab"),
   sortSelect: document.getElementById("sortSelect"),
+  resourceSelect: document.getElementById("resourceSelect"),
   themeToggle: document.getElementById("themeToggle"),
   lightbox: document.getElementById("lightbox"),
   lightboxImg: document.getElementById("lightboxImg"),
@@ -75,6 +76,8 @@ let selectedCards = new Set(); // stores card imageUrl as unique key
 
 let leaderOrderByName = new Map(); // key: normalizeName(leaderName) -> number (1-based)
 let leaderAbilityCharsByName = new Map(); // key: normalizeName(leaderName) -> number (chars in ability names + text)
+let leaderResourcesByName = new Map(); // key: normalizeName(leaderName) -> Set<string>
+let leaderHasTwoSameResourceByName = new Map(); // key: normalizeName(leaderName) -> boolean
 
 // ========== Theme ==========
 function initTheme() {
@@ -115,9 +118,9 @@ async function loadCards() {
   try {
     // Load leader ordering metadata in the background; don't block image list.
     loadLeaderMetadata().then(() => {
-      if (activeTab !== "leaders") return;
-      const sortMode = getLeaderSortMode();
-      if (sortMode === "number" || sortMode === "abilityCharsAsc" || sortMode === "abilityCharsDesc") render();
+      // Counts for the resource dropdown also depend on this metadata.
+      if (activeTab !== "leaders" && activeTab !== "beyond") return;
+      render();
     });
 
     const [leaderFiles, loreFiles] = await Promise.all([
@@ -317,41 +320,129 @@ async function loadLeaderMetadata() {
   }
 
   const nextAbilityMap = new Map();
+  const nextResourcesMap = new Map();
+  const nextTwoSameMap = new Map();
   for (let i = 0; i < nameMatches.length; i++) {
     const { name, index } = nameMatches[i];
     const key = normalizeName(name);
-    if (!key || nextAbilityMap.has(key)) continue;
+    if (!key) continue;
 
     const nextIndex = i + 1 < nameMatches.length ? nameMatches[i + 1].index : text.length;
     const slice = text.slice(index, nextIndex);
 
-    const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
-    if (abilitiesKeyIndex === -1) continue;
+    // abilities
+    if (!nextAbilityMap.has(key)) {
+      const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
+      if (abilitiesKeyIndex !== -1) {
+        const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
+        if (openParenIndex !== -1) {
+          const closeParenIndex = findMatchingParen(slice, openParenIndex);
+          if (closeParenIndex !== -1) {
+            const inside = slice.slice(openParenIndex + 1, closeParenIndex);
+            const pieces = extractDoubleQuotedStrings(inside);
+            if (pieces.length) {
+              const combined = pieces.join("");
+              const totalChars = computeAbilityCharCount(combined);
+              nextAbilityMap.set(key, totalChars);
+            }
+          }
+        }
+      }
+    }
 
-    const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
-    if (openParenIndex === -1) continue;
-    const closeParenIndex = findMatchingParen(slice, openParenIndex);
-    if (closeParenIndex === -1) continue;
+    // resources
+    if (!nextResourcesMap.has(key)) {
+      const resMatch = slice.match(/"resources"\s*:\s*\[([^\]]*)\]/);
+      if (resMatch && resMatch[1] !== undefined) {
+        const items = extractDoubleQuotedStrings(resMatch[1]);
+        const cleaned = items.map((s) => stripMarkdownForCharCount(s)).filter(Boolean);
+        const set = new Set(cleaned);
+        if (set.size) nextResourcesMap.set(key, set);
 
-    const inside = slice.slice(openParenIndex + 1, closeParenIndex);
-    const pieces = extractDoubleQuotedStrings(inside);
-    if (!pieces.length) continue;
-    const combined = pieces.join("");
-    const totalChars = computeAbilityCharCount(combined);
-    nextAbilityMap.set(key, totalChars);
+        if (!nextTwoSameMap.has(key) && cleaned.length >= 2) {
+          nextTwoSameMap.set(key, cleaned[0] === cleaned[1]);
+        }
+      }
+    }
   }
 
   leaderOrderByName = nextOrderMap;
   leaderAbilityCharsByName = nextAbilityMap;
+  leaderResourcesByName = nextResourcesMap;
+  leaderHasTwoSameResourceByName = nextTwoSameMap;
 }
 
 function getLeaderSortMode() {
   return el.sortSelect?.value || "name";
 }
 
+function getLeaderResourceFilter() {
+  return el.resourceSelect?.value || "any";
+}
+
 function updateSortControlVisibility() {
   if (!el.sortSelect) return;
-  el.sortSelect.style.display = activeTab === "leaders" ? "" : "none";
+  const show = activeTab === "leaders" || activeTab === "beyond";
+  el.sortSelect.style.display = show ? "" : "none";
+  if (el.resourceSelect) el.resourceSelect.style.display = show ? "" : "none";
+}
+
+function getLeaderBaseCardsForCounts() {
+  // Returns leader cards after tab filtering + search filtering, but BEFORE resource filtering.
+  // Used to compute counts displayed in the resource dropdown.
+  let cards = allCards;
+
+  if (activeTab === "leaders") {
+    cards = cards.filter(
+      (c) => c.type === "Leader" && !BEYOND_SET.has(normalizeName(c.name))
+    );
+  } else if (activeTab === "beyond") {
+    cards = cards.filter(
+      (c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name))
+    );
+  } else {
+    return [];
+  }
+
+  const q = (el.query.value || "").trim().toLowerCase();
+  if (q) {
+    cards = cards.filter((c) => c.name.toLowerCase().includes(q));
+  }
+
+  return cards;
+}
+
+function updateResourceDropdownCounts() {
+  if (!el.resourceSelect) return;
+  if (activeTab !== "leaders" && activeTab !== "beyond") return;
+
+  const baseCards = getLeaderBaseCardsForCounts();
+  const total = baseCards.length;
+
+  // Update "Has any" label
+  const anyOpt = el.resourceSelect.querySelector('option[value="any"]');
+  if (anyOpt) anyOpt.textContent = `Has any (${total})`;
+
+  const resourcesInOrder = ["Material", "Fuel", "Weapon", "Relic", "Psionic"];
+  for (const r of resourcesInOrder) {
+    const opt = el.resourceSelect.querySelector(`option[value="${r}"]`);
+    if (!opt) continue;
+    let count = 0;
+    for (const c of baseCards) {
+      const set = leaderResourcesByName.get(normalizeName(c.name));
+      if (set && set.has(r)) count++;
+    }
+    opt.textContent = `Has ${r} (${count})`;
+  }
+
+  const twoSameOpt = el.resourceSelect.querySelector('option[value="twoSame"]');
+  if (twoSameOpt) {
+    let count = 0;
+    for (const c of baseCards) {
+      if (leaderHasTwoSameResourceByName.get(normalizeName(c.name)) === true) count++;
+    }
+    twoSameOpt.textContent = `Has same (${count})`;
+  }
 }
 
 // ========== Rendering ==========
@@ -369,6 +460,22 @@ function getFilteredCards() {
   } else if (activeTab === "beyond") {
     // Show only the specified leaders for the "Beyond the Reach" tab
     cards = cards.filter((c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name)));
+  }
+
+  // Resource filter (leader tabs only)
+  if (activeTab === "leaders" || activeTab === "beyond") {
+    const resource = getLeaderResourceFilter();
+    if (resource && resource !== "any") {
+      cards = cards.filter((c) => {
+        if (c.type !== "Leader") return false;
+        const key = normalizeName(c.name);
+        if (resource === "twoSame") {
+          return leaderHasTwoSameResourceByName.get(key) === true;
+        }
+        const resources = leaderResourcesByName.get(key);
+        return resources ? resources.has(resource) : false;
+      });
+    }
   }
 
   // Search filter
@@ -409,6 +516,7 @@ function getFilteredCards() {
 }
 
 function render() {
+  updateResourceDropdownCounts();
   const cards = getFilteredCards();
 
   if (cards.length === 0 && allCards.length > 0) {
@@ -631,6 +739,13 @@ function init() {
   // Sort
   if (el.sortSelect) {
     el.sortSelect.addEventListener("change", () => {
+      render();
+    });
+  }
+
+  // Resource filter
+  if (el.resourceSelect) {
+    el.resourceSelect.addEventListener("change", () => {
       render();
     });
   }

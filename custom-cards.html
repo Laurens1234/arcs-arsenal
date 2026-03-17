@@ -65,6 +65,15 @@
             <option value="abilityCharsAsc">Order: Length (ascending)</option>
             <option value="abilityCharsDesc">Order: Length (descending)</option>
           </select>
+          <select id="resourceSelect" class="select" aria-label="Filter leaders by resource" style="display:none">
+            <option value="any" selected>Has any</option>
+            <option value="Material">Has Material</option>
+            <option value="Fuel">Has Fuel</option>
+            <option value="Weapon">Has Weapon</option>
+            <option value="Relic">Has Relic</option>
+            <option value="Psionic">Has Psionic</option>
+            <option value="twoSame">Has same</option>
+          </select>
           <button id="selectBtn" class="btn-compare">☑ Select</button>
           <span id="selectActions" style="display:none;gap:6px;align-items:center">
             <button id="selectAllBtn" class="btn-compare" style="padding:8px 10px;font-size:0.8rem">All</button>
