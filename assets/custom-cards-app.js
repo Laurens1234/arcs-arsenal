@@ -53,11 +53,53 @@ function getUrlTab() {
   }
 }
 
+function getUrlCardName() {
+  try {
+    const hash = (window.location.hash || "").replace(/^#/, "");
+    if (!hash) return null;
+    const params = new URLSearchParams(hash);
+    const name = params.get("card");
+    return name ? name : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+let suppressHashHandler = false;
+
+function setUrlCardName(cardName) {
+  try {
+    const path = window.location.pathname || "/";
+    const search = window.location.search || "";
+
+    const hash = (window.location.hash || "").replace(/^#/, "");
+    const params = new URLSearchParams(hash);
+    if (cardName) params.set("card", String(cardName));
+    else params.delete("card");
+
+    const nextHash = params.toString();
+    suppressHashHandler = true;
+    history.replaceState(null, "", `${path}${search}${nextHash ? "#" + nextHash : ""}`);
+  } catch (e) {
+    // ignore URL errors
+  } finally {
+    // Let the browser dispatch hashchange first if it will.
+    setTimeout(() => {
+      suppressHashHandler = false;
+    }, 0);
+  }
+}
+
+function clearUrlCardName() {
+  setUrlCardName("");
+}
+
 // ========== DOM ==========
 const el = {
   status: document.getElementById("status"),
   cardGrid: document.getElementById("cardGrid"),
   query: document.getElementById("query"),
+  searchModeSelect: document.getElementById("searchModeSelect"),
   tabs: document.querySelectorAll(".tab"),
   sortSelect: document.getElementById("sortSelect"),
   resourceSelect: document.getElementById("resourceSelect"),
@@ -68,7 +110,6 @@ const el = {
   lightboxTitle: document.getElementById("lightboxTitle"),
   lightboxMeta: document.getElementById("lightboxMeta"),
   lightboxAbilities: document.getElementById("lightboxAbilities"),
-  lightboxClose: document.querySelector(".lightbox-close"),
   lightboxBackdrop: document.querySelector(".lightbox-backdrop"),
 };
 
@@ -164,6 +205,24 @@ async function loadCards() {
 
     el.status.textContent = "";
     render();
+
+    // If the URL has a card hash, open it (and switch to a sensible tab).
+    const cardFromUrl = getUrlCardName();
+    if (cardFromUrl) {
+      const target = allCards.find((c) => normalizeName(c.name) === normalizeName(cardFromUrl));
+      if (target) {
+        if (target.type === "Leader") {
+          activeTab = BEYOND_SET.has(normalizeName(target.name)) ? "beyond" : "leaders";
+        } else if (target.type === "Lore") {
+          activeTab = "lore";
+        }
+        el.tabs.forEach((t) => t.classList.toggle("active", t.dataset.tab === activeTab));
+        setUrlTab(activeTab);
+        updateSortControlVisibility();
+        render();
+        openLightbox(target);
+      }
+    }
   } catch (err) {
     el.status.textContent = `Error loading cards: ${err.message}`;
     el.status.classList.add("error");
@@ -486,6 +545,38 @@ function getLeaderSetupFilter() {
   return el.setupSelect?.value || "any";
 }
 
+function getSearchMode() {
+  const mode = el.searchModeSelect?.value || "name";
+  if (mode === "abilities" || mode === "both" || mode === "name") return mode;
+  return "name";
+}
+
+function getLeaderAbilitySearchText(cardName) {
+  const key = normalizeName(cardName);
+  const raw = leaderAbilityTextByName.get(key) || "";
+  // Use a normalized visible-ish string for searching.
+  return stripMarkdownForCharCount(raw).toLowerCase();
+}
+
+function cardMatchesQuery(card, qLower, searchMode) {
+  if (!qLower) return true;
+  const nameText = String(card?.name || "").toLowerCase();
+
+  if (searchMode === "name") {
+    return nameText.includes(qLower);
+  }
+
+  if (searchMode === "abilities") {
+    if (card?.type !== "Leader") return false;
+    return getLeaderAbilitySearchText(card.name).includes(qLower);
+  }
+
+  // both
+  if (nameText.includes(qLower)) return true;
+  if (card?.type !== "Leader") return false;
+  return getLeaderAbilitySearchText(card.name).includes(qLower);
+}
+
 function updateSortControlVisibility() {
   if (!el.sortSelect) return;
   const show = activeTab === "leaders" || activeTab === "beyond";
@@ -533,8 +624,9 @@ function getLeaderBaseCardsForCounts() {
   }
 
   const q = (el.query.value || "").trim().toLowerCase();
+  const mode = getSearchMode();
   if (q) {
-    cards = cards.filter((c) => c.name.toLowerCase().includes(q));
+    cards = cards.filter((c) => cardMatchesQuery(c, q, mode));
   }
 
   return cards;
@@ -652,8 +744,9 @@ function getFilteredCards() {
 
   // Search filter
   const q = (el.query.value || "").trim().toLowerCase();
+  const mode = getSearchMode();
   if (q) {
-    cards = cards.filter((c) => c.name.toLowerCase().includes(q));
+    cards = cards.filter((c) => cardMatchesQuery(c, q, mode));
   }
 
   // Sorting (leaders tab only)
@@ -839,6 +932,7 @@ function openLightbox(card) {
   updateLightboxDetails(card);
   el.lightbox.classList.remove("hidden");
   document.body.style.overflow = "hidden";
+  setUrlCardName(card.name);
 }
 
 function closeLightbox() {
@@ -847,6 +941,7 @@ function closeLightbox() {
   currentLightboxCard = null;
   clearLightboxDetails();
   document.body.style.overflow = "";
+  clearUrlCardName();
 }
 
 // ========== Selection ==========
@@ -1038,12 +1133,30 @@ function init() {
 
   // Search
   el.query.addEventListener("input", render);
+  if (el.searchModeSelect) {
+    el.searchModeSelect.addEventListener("change", render);
+  }
 
   // Lightbox close
-  el.lightboxClose.addEventListener("click", closeLightbox);
   el.lightboxBackdrop.addEventListener("click", closeLightbox);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeLightbox();
+  });
+
+  window.addEventListener("hashchange", () => {
+    if (suppressHashHandler) return;
+    const cardName = getUrlCardName();
+    if (!cardName) {
+      if (!el.lightbox.classList.contains("hidden")) closeLightbox();
+      return;
+    }
+
+    const target = allCards.find((c) => normalizeName(c.name) === normalizeName(cardName));
+    if (target) {
+      if (!currentLightboxCard || normalizeName(currentLightboxCard.name) !== normalizeName(target.name)) {
+        openLightbox(target);
+      }
+    }
   });
 
   loadCards();

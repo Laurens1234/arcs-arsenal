@@ -11,6 +11,26 @@ html {
   text-underline-offset: 2px;
 }
 
+/* Search: mode "button" attached to the input */
+.search-group {
+  display: flex;
+  align-items: stretch;
+}
+
+.search-group .search-mode {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-right: 10px;
+  padding-left: 10px;
+  min-width: 0;
+}
+
+.search-group .search {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  width: 220px;
+}
+
 /* Type badge on cards */
 .gen-card-type-badge {
   position: absolute;
@@ -67,7 +87,7 @@ html {
   display: flex;
   flex-direction: row;
   gap: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .lightbox-content img {
@@ -144,8 +164,8 @@ html {
 
 .lightbox-close {
   position: absolute;
-  top: -16px;
-  right: -16px;
+  top: 8px;
+  right: 8px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -158,7 +178,7 @@ html {
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  z-index: 1;
+  z-index: 2;
 }
 
 .lightbox-close:hover {
@@ -184,6 +204,14 @@ html {
   .controls > * {
     min-width: 0;
     max-width: 100%;
+  }
+
+  .search-group {
+    width: 100%;
+  }
+
+  .search-group .search {
+    width: 100%;
   }
 
   #selectActions {

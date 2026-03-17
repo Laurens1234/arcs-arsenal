@@ -58,12 +58,19 @@
           <button class="tab" data-tab="beyond">Beyond the Reach</button>
         </div>
         <div class="controls">
-          <input id="query" type="search" class="search" placeholder="Search…" />
+          <div class="search-group" aria-label="Search">
+            <select id="searchModeSelect" class="select search-mode" aria-label="Search mode">
+              <option value="name" selected>Name</option>
+              <option value="abilities">Abilities</option>
+              <option value="both">Both</option>
+            </select>
+            <input id="query" type="search" class="search" placeholder="Search…" />
+          </div>
           <select id="sortSelect" class="select" aria-label="Order leaders" style="display:none">
             <option value="number" selected>Order: Card #</option>
             <option value="name">Order: Name</option>
-            <option value="abilityCharsAsc">Order: Length (ascending)</option>
-            <option value="abilityCharsDesc">Order: Length (descending)</option>
+            <option value="abilityCharsAsc">Order: Length ↑</option>
+            <option value="abilityCharsDesc">Order: Length ↓</option>
           </select>
           <select id="resourceSelect" class="select" aria-label="Filter leaders by resource" style="display:none">
             <option value="any" selected>Has any</option>
@@ -101,7 +108,6 @@
     <div id="lightbox" class="lightbox hidden">
       <div class="lightbox-backdrop"></div>
       <div class="lightbox-content">
-        <button class="lightbox-close">✕</button>
         <img id="lightboxImg" src="" alt="" />
         <div class="lightbox-details">
           <div id="lightboxTitle" class="lightbox-title"></div>
