@@ -61,6 +61,7 @@ const el = {
   tabs: document.querySelectorAll(".tab"),
   sortSelect: document.getElementById("sortSelect"),
   resourceSelect: document.getElementById("resourceSelect"),
+  setupSelect: document.getElementById("setupSelect"),
   themeToggle: document.getElementById("themeToggle"),
   lightbox: document.getElementById("lightbox"),
   lightboxImg: document.getElementById("lightboxImg"),
@@ -78,6 +79,7 @@ let leaderOrderByName = new Map(); // key: normalizeName(leaderName) -> number (
 let leaderAbilityCharsByName = new Map(); // key: normalizeName(leaderName) -> number (chars in ability names + text)
 let leaderResourcesByName = new Map(); // key: normalizeName(leaderName) -> Set<string>
 let leaderHasTwoSameResourceByName = new Map(); // key: normalizeName(leaderName) -> boolean
+let leaderSetupFootprintByName = new Map(); // key: normalizeName(leaderName) -> string (e.g. "3-3-2|CS-")
 
 // ========== Theme ==========
 function initTheme() {
@@ -322,6 +324,7 @@ async function loadLeaderMetadata() {
   const nextAbilityMap = new Map();
   const nextResourcesMap = new Map();
   const nextTwoSameMap = new Map();
+  const nextSetupMap = new Map();
   for (let i = 0; i < nameMatches.length; i++) {
     const { name, index } = nameMatches[i];
     const key = normalizeName(name);
@@ -364,12 +367,48 @@ async function loadLeaderMetadata() {
         }
       }
     }
+
+    // setup footprint
+    if (!nextSetupMap.has(key)) {
+      const setupMatch = slice.match(/"setup"\s*:\s*\{([\s\S]*?)\}\s*,?\s*(?:"body_font_size"|\}|$)/);
+      const setupText = setupMatch ? setupMatch[1] : "";
+      if (setupText) {
+        function readSlot(slot) {
+          // Capture ships + building within the slot dict.
+          const slotRe = new RegExp(`"${slot}"\\s*:\\s*\\{[\\s\\S]*?"ships"\\s*:\\s*(\\d+)[\\s\\S]*?"building"\\s*:\\s*"([^\"]+)"`, "m");
+          const m = setupText.match(slotRe);
+          if (!m) return null;
+          const ships = parseInt(m[1], 10);
+          const buildingRaw = stripMarkdownForCharCount(m[2]);
+          const building = (buildingRaw || "").toLowerCase();
+          return { ships: Number.isFinite(ships) ? ships : 0, building };
+        }
+
+        const a = readSlot("A");
+        const b = readSlot("B");
+        const c = readSlot("C");
+        if (a && b && c) {
+          const shipsPattern = `${a.ships}-${b.ships}-${c.ships}`;
+          function bldChar(bld) {
+            if (bld === "city") return "C";
+            if (bld === "starport") return "S";
+            return "-";
+          }
+          const buildingsPattern3 = `${bldChar(a.building)}${bldChar(b.building)}${bldChar(c.building)}`;
+          const buildingsPattern = buildingsPattern3.endsWith("-")
+            ? buildingsPattern3.slice(0, -1)
+            : buildingsPattern3;
+          nextSetupMap.set(key, `${shipsPattern}|${buildingsPattern}`);
+        }
+      }
+    }
   }
 
   leaderOrderByName = nextOrderMap;
   leaderAbilityCharsByName = nextAbilityMap;
   leaderResourcesByName = nextResourcesMap;
   leaderHasTwoSameResourceByName = nextTwoSameMap;
+  leaderSetupFootprintByName = nextSetupMap;
 }
 
 function getLeaderSortMode() {
@@ -380,16 +419,42 @@ function getLeaderResourceFilter() {
   return el.resourceSelect?.value || "any";
 }
 
+function getLeaderSetupFilter() {
+  return el.setupSelect?.value || "any";
+}
+
 function updateSortControlVisibility() {
   if (!el.sortSelect) return;
   const show = activeTab === "leaders" || activeTab === "beyond";
   el.sortSelect.style.display = show ? "" : "none";
   if (el.resourceSelect) el.resourceSelect.style.display = show ? "" : "none";
+  if (el.setupSelect) el.setupSelect.style.display = show ? "" : "none";
+}
+
+function filterLeaderCardsByResource(cards, resource) {
+  if (!resource || resource === "any") return cards;
+  return cards.filter((c) => {
+    if (c.type !== "Leader") return false;
+    const key = normalizeName(c.name);
+    if (resource === "twoSame") {
+      return leaderHasTwoSameResourceByName.get(key) === true;
+    }
+    const resources = leaderResourcesByName.get(key);
+    return resources ? resources.has(resource) : false;
+  });
+}
+
+function filterLeaderCardsBySetup(cards, setupKey) {
+  if (!setupKey || setupKey === "any") return cards;
+  return cards.filter((c) => {
+    if (c.type !== "Leader") return false;
+    return leaderSetupFootprintByName.get(normalizeName(c.name)) === setupKey;
+  });
 }
 
 function getLeaderBaseCardsForCounts() {
   // Returns leader cards after tab filtering + search filtering, but BEFORE resource filtering.
-  // Used to compute counts displayed in the resource dropdown.
+  // Used to compute counts displayed in the filter dropdowns.
   let cards = allCards;
 
   if (activeTab === "leaders") {
@@ -416,7 +481,8 @@ function updateResourceDropdownCounts() {
   if (!el.resourceSelect) return;
   if (activeTab !== "leaders" && activeTab !== "beyond") return;
 
-  const baseCards = getLeaderBaseCardsForCounts();
+  // Counts should respect the other filter (setup), but not this resource filter.
+  const baseCards = filterLeaderCardsBySetup(getLeaderBaseCardsForCounts(), getLeaderSetupFilter());
   const total = baseCards.length;
 
   // Update "Has any" label
@@ -445,6 +511,59 @@ function updateResourceDropdownCounts() {
   }
 }
 
+function formatSetupFootprintLabel(setupKey) {
+  // setupKey is "shipsPattern|buildingsPattern".
+  const [ships, buildings] = String(setupKey).split("|");
+  if (!ships || !buildings) return String(setupKey);
+  return `${ships} / ${buildings}`;
+}
+
+function updateSetupDropdownOptionsAndCounts() {
+  if (!el.setupSelect) return;
+  if (activeTab !== "leaders" && activeTab !== "beyond") return;
+
+  const selected = getLeaderSetupFilter();
+
+  // Counts should respect the other filter (resource), but not this setup filter.
+  const baseCards = filterLeaderCardsByResource(getLeaderBaseCardsForCounts(), getLeaderResourceFilter());
+
+  const counts = new Map();
+  for (const c of baseCards) {
+    const key = leaderSetupFootprintByName.get(normalizeName(c.name));
+    if (!key) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+
+  const keys = [...counts.keys()];
+  keys.sort((a, b) => {
+    const aCount = counts.get(a) || 0;
+    const bCount = counts.get(b) || 0;
+    if (aCount !== bCount) return bCount - aCount;
+
+    const [aShips, aBld] = String(a).split("|");
+    const [bShips, bBld] = String(b).split("|");
+    const aTotal = (aShips || "").split("-").reduce((s, x) => s + (parseInt(x, 10) || 0), 0);
+    const bTotal = (bShips || "").split("-").reduce((s, x) => s + (parseInt(x, 10) || 0), 0);
+    if (aTotal !== bTotal) return bTotal - aTotal;
+    if (aShips !== bShips) return String(aShips).localeCompare(String(bShips));
+    return String(aBld).localeCompare(String(bBld));
+  });
+
+  // Rebuild options (preserve selection if possible)
+  const total = baseCards.length;
+  const anyText = `Setup: Any (${total})`;
+  el.setupSelect.innerHTML = `<option value="any">${anyText}</option>` +
+    keys.map((k) => {
+      const n = counts.get(k) || 0;
+      const label = formatSetupFootprintLabel(k);
+      return `<option value="${String(k).replace(/"/g, "&quot;")}">Setup: ${label} (${n})</option>`;
+    }).join("");
+
+  // Restore selection
+  const stillExists = [...el.setupSelect.options].some((o) => o.value === selected);
+  el.setupSelect.value = stillExists ? selected : "any";
+}
+
 // ========== Rendering ==========
 function getFilteredCards() {
   let cards = allCards;
@@ -462,20 +581,10 @@ function getFilteredCards() {
     cards = cards.filter((c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name)));
   }
 
-  // Resource filter (leader tabs only)
+  // Filters (leader tabs only)
   if (activeTab === "leaders" || activeTab === "beyond") {
-    const resource = getLeaderResourceFilter();
-    if (resource && resource !== "any") {
-      cards = cards.filter((c) => {
-        if (c.type !== "Leader") return false;
-        const key = normalizeName(c.name);
-        if (resource === "twoSame") {
-          return leaderHasTwoSameResourceByName.get(key) === true;
-        }
-        const resources = leaderResourcesByName.get(key);
-        return resources ? resources.has(resource) : false;
-      });
-    }
+    cards = filterLeaderCardsByResource(cards, getLeaderResourceFilter());
+    cards = filterLeaderCardsBySetup(cards, getLeaderSetupFilter());
   }
 
   // Search filter
@@ -517,6 +626,7 @@ function getFilteredCards() {
 
 function render() {
   updateResourceDropdownCounts();
+  updateSetupDropdownOptionsAndCounts();
   const cards = getFilteredCards();
 
   if (cards.length === 0 && allCards.length > 0) {
@@ -746,6 +856,13 @@ function init() {
   // Resource filter
   if (el.resourceSelect) {
     el.resourceSelect.addEventListener("change", () => {
+      render();
+    });
+  }
+
+  // Setup filter
+  if (el.setupSelect) {
+    el.setupSelect.addEventListener("change", () => {
       render();
     });
   }
