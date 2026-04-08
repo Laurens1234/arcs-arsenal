@@ -1175,6 +1175,62 @@ function computeAbilityCharCount(abilitiesCombinedText) {
 }
 
 async function loadLeaderMetadata() {
+  // Prefer local pre-generated metadata to avoid cross-origin fetch/parsing issues.
+  try {
+    if (ASSETS_BASE_URL) {
+      const url = new URL("leader-generator-metadata.json", ASSETS_BASE_URL).href;
+      const res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        const json = await res.json();
+        const entries = Array.isArray(json?.entries) ? json.entries : null;
+        if (entries) {
+          const nextOrderMap = new Map();
+          const nextAbilityMap = new Map();
+          const nextAbilityTextMap = new Map();
+          const nextResourcesMap = new Map();
+          const nextResourceListMap = new Map();
+          const nextTwoSameMap = new Map();
+          const nextSetupMap = new Map();
+
+          for (const e of entries) {
+            const key = typeof e?.key === "string" ? e.key : "";
+            if (!key) continue;
+            if (typeof e?.order === "number" && Number.isFinite(e.order)) nextOrderMap.set(key, e.order);
+            if (typeof e?.abilitiesText === "string" && e.abilitiesText) {
+              nextAbilityTextMap.set(key, e.abilitiesText);
+              if (typeof e?.abilityChars === "number" && Number.isFinite(e.abilityChars)) {
+                nextAbilityMap.set(key, e.abilityChars);
+              } else {
+                nextAbilityMap.set(key, computeAbilityCharCount(e.abilitiesText));
+              }
+            }
+            const resources = Array.isArray(e?.resources) ? e.resources.filter(Boolean) : [];
+            if (resources.length) {
+              nextResourceListMap.set(key, resources);
+              nextResourcesMap.set(key, new Set(resources));
+              nextTwoSameMap.set(key, e?.hasTwoSameResource === true);
+            }
+            if (typeof e?.setupKey === "string" && e.setupKey) {
+              nextSetupMap.set(key, e.setupKey);
+            }
+          }
+
+          leaderOrderByName = nextOrderMap;
+          leaderAbilityCharsByName = nextAbilityMap;
+          leaderAbilityTextByName = nextAbilityTextMap;
+          leaderResourcesByName = nextResourcesMap;
+          leaderResourceListByName = nextResourceListMap;
+          leaderHasTwoSameResourceByName = nextTwoSameMap;
+          leaderSetupFootprintByName = nextSetupMap;
+          leaderMetadataLoaded = true;
+          return;
+        }
+      }
+    }
+  } catch (e) {
+    // Fall back to fetching/parsing the generator output below.
+  }
+
   const urls = {
     leaders: `${RAW_BASE}/scripts/leadersFormatted.py`,
     btr: `${RAW_BASE}/scripts/btrFormatted.py`,
