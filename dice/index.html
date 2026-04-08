@@ -1,13 +1,308 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8" />
+    <base href="../" />
     <meta name="robots" content="noindex" />
-    <meta http-equiv="refresh" content="0; url=../dice.html" />
+    <meta name="viewport" content="width=1248, initial-scale=0.3" />
+    <title>Arcs Dice Calculator</title>
+    <meta name="application-name" content="Arcs Arsenal" />
+    <meta name="description" content="Calculate probabilities for Arcs dice rolls." />
     <link rel="canonical" href="https://laurens1234.github.io/arcs-arsenal/dice.html" />
-    <title>Redirecting…</title>
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Arcs Arsenal" />
+    <meta property="og:title" content="Arcs Dice Calculator" />
+    <meta property="og:description" content="Calculate probabilities for Arcs dice rolls." />
+    <meta property="og:url" content="https://laurens1234.github.io/arcs-arsenal/dice.html" />
+    <meta property="og:image" content="https://laurens1234.github.io/arcs-arsenal/android-chrome-512x512.png" />
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Arcs Dice Calculator" />
+    <meta name="twitter:description" content="Calculate probabilities for Arcs dice rolls." />
+    <meta name="twitter:image" content="https://laurens1234.github.io/arcs-arsenal/android-chrome-512x512.png" />
+    <meta name="theme-color" content="#8b5cf6" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" type="image/png" sizes="48x48" href="./favicon-48x48.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
+    <link rel="shortcut icon" href="./favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./site.webmanifest" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Arcs Arsenal",
+        "url": "https://laurens1234.github.io/arcs-arsenal/"
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Arcs Dice Calculator",
+        "url": "https://laurens1234.github.io/arcs-arsenal/dice.html",
+        "isPartOf": {
+          "@type": "WebSite",
+          "name": "Arcs Arsenal",
+          "url": "https://laurens1234.github.io/arcs-arsenal/"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="./assets/style.css" />
+    <link rel="stylesheet" href="./assets/dice.css" />
+    <style>
+      html {
+        scrollbar-width: none;
+      }
+      html::-webkit-scrollbar {
+        display: none;
+      }
+      body {
+        touch-action: manipulation;
+      }
+      .dice-calculator {
+        width: 1200px;
+        margin: 0 auto;
+      }
+      .container {
+        max-width: none !important;
+        min-width: 1248px !important;
+        padding: 0 24px !important;
+      }
+      .nav .container {
+        flex-direction: row !important;
+      }
+      .header-inner {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+      }
+      .logo {
+        font-size: 2.5rem !important;
+      }
+      .tagline {
+        font-size: 1rem !important;
+      }
+      #bellCurvesSection {
+        max-width: none !important;
+        width: 100% !important;
+      }
+
+      @media (max-width: 768px) {
+        #cardModal .modal-content {
+          max-width: 95vw !important;
+        }
+        #cardModalImage {
+          max-width: 90vw !important;
+        }
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
-    <p>Redirecting to <a href="../dice.html">dice.html</a>…</p>
+    <header class="header">
+      <div class="container header-inner">
+        <div>
+          <h1 class="logo"><a href="./" style="text-decoration:none;color:inherit">Dice Calculator</a></h1>
+          <p class="tagline">Calculate probabilities for Arcs dice rolls.</p>
+        </div>
+        <button id="themeToggle" class="theme-toggle" aria-label="Toggle theme">
+          <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+          <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <nav class="nav">
+      <div class="container">
+        <div class="nav-left">
+          <a href="./" class="btn-compare">← Home</a>
+        </div>
+        <div class="nav-right">
+          <button id="addDieRollBtn" class="btn-add">Add Die Roll</button>
+          <button id="advancedToggle" class="advanced-toggle" aria-label="Toggle advanced mode">Advanced Mode</button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="main">
+      <div class="container">
+        <div id="status" class="status">Loading dice calculator…</div>
+
+        <!-- ===== PROBABILITY CALCULATOR ===== -->
+        <div class="dice-calculator">
+          <div class="calculator-layout">
+            <div class="dice-sections">
+              <div class="dice-inputs">
+                <div class="dice-row">
+                  <button class="dice-label-btn assault-label">Assault</button>
+                  <div class="dice-visual assault-visual"></div>
+                  <button class="dice-clear-btn assault-clear" title="Clear all Assault dice">×</button>
+                </div>
+                <div class="dice-row">
+                  <button class="dice-label-btn skirmish-label">Skirmish</button>
+                  <div class="dice-visual skirmish-visual"></div>
+                  <button class="dice-clear-btn skirmish-clear" title="Clear all Skirmish dice">×</button>
+                </div>
+                <div class="dice-row">
+                  <button class="dice-label-btn raid-label">Raid</button>
+                  <div class="dice-visual raid-visual"></div>
+                  <button class="dice-clear-btn raid-clear" title="Clear all Raid dice">×</button>
+                </div>
+              </div>
+            </div>
+            <div id="customProbSection"></div>
+          </div>
+          <div id="result" class="calc-result"></div>
+          <div class="intercept-config" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+            <div class="intercept-row" style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <label for="skirmishRerolls">Skirmishers rerolls:</label>
+              <select id="skirmishRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <label for="assaultRerolls">Seeker Torpedoes rerolls:</label>
+              <select id="assaultRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <button id="assaultRerollFacesBtn" style="padding: 6px 12px; background: #83271c; border: 1px solid #83271c; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Seeker Faces</button>
+              <label for="raidRerolls">Corsair rerolls:</label>
+              <select id="raidRerolls" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+              <button id="raidRerollFacesBtn" style="padding: 6px 12px; background: #d07430; border: 1px solid #d07430; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Corsair Faces</button>
+            </div>
+            <div class="intercept-row" style="display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <label style="font-size: 0.9em;"><input type="checkbox" id="empathVision"> Empath's Vision rerolls:</label>
+              <button id="empathRerollFacesBtn" style="padding: 6px 12px; background: #7c3aed; border: 1px solid #7c3aed; border-radius: var(--radius-sm); cursor: pointer; color: white; font-size: 0.9rem;">Select Empath Faces</button>
+              <label for="interceptMultiplier">Self-hits if Intercepted:</label>
+              <select id="interceptMultiplier" class="header-select">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+                <option value="13">13</option>
+                <option value="14">14</option>
+                <option value="15">15</option>
+              </select>
+              <div class="intercept-options" style="display: flex; flex-direction: column; gap: 5px;">
+                <label style="font-size: 0.9em;"><input type="checkbox" id="mirrorPlating"> Mirror Plating (+1 intercept, requires assault dice)</label>
+                <label style="font-size: 0.9em;"><input type="checkbox" id="signalBreaker"> Signal Breaker (ignore 1 rolled intercept)</label>
+              </div>
+              <button id="helpBtn" class="btn-roll" style="padding: 6px 12px; font-size: 0.9rem; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;">?</button>
+            </div>
+          <div class="roll-section">
+            <button id="rollDiceBtn" class="btn-roll">🎲 Roll Dice</button>
+          </div>
+          <div id="bellCurvesSection"></div>
+        </div>
+      </div>
+    </main>
+
+    <div id="assaultRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Drag to reorder faces by priority (top = highest priority)</p>        <div id="assaultFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="assaultRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="assaultRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="raidRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Drag to reorder faces by priority (top = highest priority)</p>        <div id="raidFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="raidRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="raidRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="empathRerollModal" class="modal">
+      <div class="modal-content">
+        <h3>Select Faces to Reroll</h3>
+        <p style="font-size: 0.9rem; color: var(--text); margin: 5px 0 15px; opacity: 0.8;">Click faces to select which ones should be rerolled when Empath's Vision is active.</p>
+        <div id="empathFacesCheckboxes"></div>
+        <div style="margin-top: 10px;">
+          <button id="empathRerollSaveBtn" class="btn-modal-primary">Save</button>
+          <button id="empathRerollCancelBtn" class="btn-modal-secondary">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+      <div class="modal-content" style="max-width: 900px;">
+        <h3>Dice Calculator Settings Help</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; justify-items: center;">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/BC13.png" alt="Skirmishers" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Skirmishers" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/BC13.png', 'Skirmishers')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L14.png" alt="Seeker Torpedoes" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Seeker Torpedoes" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L14.png', 'Seeker Torpedoes')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/LEAD11.png" alt="Corsair" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Corsair" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/LEAD11.png', 'Corsair')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L19.png" alt="Empath's Vision" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Empath's Vision" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L19.png', 'Empath\'s Vision')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L04.png" alt="Mirror Plating" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Mirror Plating" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L04.png', 'Mirror Plating')">
+          
+          <img src="https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L06.png" alt="Signal Breaker" style="width: 180px; height: auto; border-radius: 8px; cursor: pointer;" title="Signal Breaker" onclick="showEnlargedCard('https://raw.githubusercontent.com/buriedgiantstudios/cards/master/content/card-images/arcs/en-US/L06.png', 'Signal Breaker')">
+          
+        </div>
+        <div style="margin-top: 20px; text-align: center;">
+          <button id="helpCloseBtn" class="btn-modal-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="cardModal" class="modal">
+      <div class="modal-content" style="max-width: 500px; text-align: center;">
+        <span id="cardModalClose" style="position: absolute; top: 10px; right: 20px; font-size: 28px; font-weight: bold; cursor: pointer; color: #aaa;">&times;</span>
+        <h3 id="cardModalTitle"></h3>
+        <img id="cardModalImage" src="" alt="" style="width: 100%; max-width: 400px; height: auto; border-radius: 8px; margin: 20px 0;">
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="container">
+        <p><a href="./tierlist.html">My Tier List</a> · <a href="./data.html">Data Arsenal</a> · <a href="./draft.html">Draft Helper</a> · <a href="./dice.html">Dice Calculator</a> · <a href="./custom-cards.html">Custom Cards</a> · <a href="./">Home</a></p>
+      </div>
+    </footer>
+
+    <script type="module" src="./assets/dice-app.js"></script>
   </body>
 </html>
