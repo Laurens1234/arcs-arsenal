@@ -16,7 +16,8 @@ const BEYOND_NAMES = [
   "Diplomat",
   "Imperator",
   "Ancient Wraith",
-  "Poet"
+  "Poet",
+  "Brainbox"
 ];
 const BEYOND_SET = new Set(BEYOND_NAMES.map(n => normalizeName(n)));
 
