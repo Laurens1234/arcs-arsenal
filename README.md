@@ -21,16 +21,6 @@ https://laurens1234.github.io/arcs-arsenal/
 - Community data from [BoardGameGeek](https://boardgamegeek.com/thread/3604653/leaders-and-lore-ranking-and-winrates)
 - Card images from [buriedgiantstudios/cards](https://github.com/buriedgiantstudios/cards)
 
-## Custom Cards: GitHub API rate limits
-
-The Custom Cards page loads the latest generated card list from the GitHub API. If you refresh a lot (or use features that query commit history), you may hit GitHub's unauthenticated rate limit and see `403 (Forbidden)`.
-
-Optional workaround (local only):
-- Create a GitHub personal access token (classic) with no scopes, or a fine-grained token with read-only access to public repos.
-- In your browser devtools console on this site, run:
-	- `localStorage.setItem('arcs-github-token', 'YOUR_TOKEN_HERE')`
-- Refresh the page.
-
 ## Todo/ideas
 
 Dice Calculator:

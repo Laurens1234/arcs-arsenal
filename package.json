@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "generate:icons": "node ./scripts/generate-icons.mjs",
-    "update:card-manifest": "node ./scripts/update-leader-generator-manifest.mjs",
     "test": "node ./test/run-tests.js"
   },
   "devDependencies": {

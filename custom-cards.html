@@ -100,7 +100,6 @@
           <select id="sortSelect" class="select" aria-label="Order leaders" style="display:none">
             <option value="number" selected>Order: Card #</option>
             <option value="name">Order: Name</option>
-            <option value="lastChanged">Order: Last changed</option>
             <option value="abilityCharsAsc">Order: Length ↑</option>
             <option value="abilityCharsDesc">Order: Length ↓</option>
           </select>
@@ -122,10 +121,6 @@
             <button id="deselectAllBtn" class="btn-compare" style="padding:8px 10px;font-size:0.8rem">None</button>
             <span id="selectionCount" style="font-size:0.8rem;color:var(--text-muted)"></span>
           </span>
-          <div id="randomDraftActions" class="draft-group" aria-label="Random draft">
-            <button id="randomDraftBtn" class="btn-compare draft-btn" type="button">Draft</button>
-            <input id="randomDraftCount" type="number" class="select draft-count" min="1" value="5" aria-label="Draft size" />
-          </div>
           <button id="downloadBtn" class="btn-compare">↓ Download All</button>
           <button id="printBtn" class="btn-compare">🖨 Print All</button>
           <a href="./" class="btn-compare">← Home</a>
@@ -149,23 +144,7 @@
           <div id="lightboxTitle" class="lightbox-title"></div>
           <div id="lightboxMeta" class="lightbox-meta"></div>
           <div id="lightboxAbilities" class="lightbox-abilities"></div>
-          <div class="lightbox-actions">
-            <button id="historyBtn" class="btn-compare" type="button" aria-expanded="false">Previous Versions</button>
-          </div>
         </div>
-      </div>
-    </div>
-
-    <!-- Full-screen Previous Versions Modal -->
-    <div id="historyModal" class="history-modal hidden" aria-hidden="true">
-      <div class="history-modal-backdrop"></div>
-      <div class="history-modal-content" role="dialog" aria-modal="true" aria-label="Previous versions">
-        <div class="history-modal-header">
-          <div id="historyModalTitle" class="history-modal-title">Previous Versions</div>
-          <button id="historyModalClose" class="btn-compare" type="button">✕</button>
-        </div>
-        <div id="historyModalStatus" class="history-status"></div>
-        <div id="historyModalGrid" class="history-grid"></div>
       </div>
     </div>
 
