@@ -349,17 +349,23 @@ html {
   }
 
   .print-container {
-    display: flex !important;
-    flex-wrap: wrap;
-    gap: 0mm;
+    display: block !important;
     padding: 0;
     margin: 0;
-    align-items: flex-start;
-    align-content: flex-start;
     background: white;
     min-height: 0;
     height: auto;
     overflow: visible;
+  }
+
+  .print-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0;
+    align-items: flex-start;
+    align-content: flex-start;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* Leader cards: exactly 70×120mm */
@@ -375,10 +381,32 @@ html {
   }
 
   .print-card {
+    /* Cut guides: draw inside the card box so they don't bleed across page breaks */
+    position: relative;
     overflow: hidden;
     flex-shrink: 0;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .print-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    /* Single-width shared cut lines: draw top+left always, and add right/bottom only at row/page edges */
+    border-style: solid;
+    border-color: rgba(0, 0, 0, 0.35);
+    border-width: var(--cut-top, 0.25mm) var(--cut-right, 0mm) var(--cut-bottom, 0mm) var(--cut-left, 0.25mm);
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+
+  .print-card.cut-right {
+    --cut-right: 0.25mm;
+  }
+
+  .print-card.cut-bottom {
+    --cut-bottom: 0.25mm;
   }
 
   .print-card img {
@@ -391,7 +419,8 @@ html {
   }
 
   @page {
-    margin: 5mm;
+    /* Nudge content down a bit to avoid page-edge clipping artifacts */
+    margin: 8mm 5mm 5mm 5mm;
     size: A4;
   }
 }

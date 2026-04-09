@@ -1049,19 +1049,59 @@ function printCards() {
   const container = document.getElementById("printContainer");
   container.innerHTML = "";
 
-  // Pre-load all images, then print
-  const promises = cards.map((card) => {
-    return new Promise((resolve) => {
+  // Build explicit rows so adjacent cards can share a single cut line (no doubled borders).
+  // Assumes A4 with @page horizontal margins totaling 10mm (see CSS): usable width ≈ 200mm.
+  const PAGE_CONTENT_WIDTH_MM = 200;
+  const widthMmForCard = (card) => (card.type === "Lore" ? 63 : 70);
+
+  /** @type {Array<Array<any>>} */
+  const rows = [];
+  let currentRow = [];
+  let currentWidth = 0;
+
+  for (const card of cards) {
+    const w = widthMmForCard(card);
+    if (currentRow.length > 0 && currentWidth + w > PAGE_CONTENT_WIDTH_MM) {
+      rows.push(currentRow);
+      currentRow = [];
+      currentWidth = 0;
+    }
+    currentRow.push(card);
+    currentWidth += w;
+  }
+  if (currentRow.length > 0) rows.push(currentRow);
+
+  const promises = [];
+  rows.forEach((rowCards, rowIndex) => {
+    const rowEl = document.createElement("div");
+    rowEl.className = "print-row";
+
+    rowCards.forEach((card, colIndex) => {
       const div = document.createElement("div");
-      div.className = `print-card ${card.type === "Lore" ? "print-card-lore" : "print-card-leader"}`;
+      const isLeader = card.type !== "Lore";
+      const isEndOfRow = colIndex === rowCards.length - 1;
+      const isLastRow = rowIndex === rows.length - 1;
+      div.className = [
+        "print-card",
+        isLeader ? "print-card-leader" : "print-card-lore",
+        isEndOfRow ? "cut-right" : "",
+        isLastRow ? "cut-bottom" : "",
+      ].filter(Boolean).join(" ");
+
       const img = document.createElement("img");
       img.src = card.imageUrl;
       img.alt = card.name;
-      img.onload = resolve;
-      img.onerror = resolve; // don't block on broken images
+
+      promises.push(new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve; // don't block on broken images
+      }));
+
       div.appendChild(img);
-      container.appendChild(div);
+      rowEl.appendChild(div);
     });
+
+    container.appendChild(rowEl);
   });
 
   Promise.all(promises).then(() => {
