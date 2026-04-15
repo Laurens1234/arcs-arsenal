@@ -241,6 +241,9 @@ async function loadCards() {
 
     courtCards = [...guild, ...vox].sort((a, b) => a.name.localeCompare(b.name));
 
+    // Ensure the "All" tab includes court deck cards (guild + vox)
+    allCards = [...leaders, ...lore, ...guild, ...vox].sort((a, b) => a.name.localeCompare(b.name));
+
     el.status.textContent = "";
     render();
 
