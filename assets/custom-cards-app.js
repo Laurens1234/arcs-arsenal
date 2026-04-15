@@ -184,7 +184,7 @@ async function loadCards() {
     // Load leader ordering metadata in the background; don't block image list.
     loadLeaderMetadata().then(() => {
       // Counts for the resource dropdown also depend on this metadata.
-      if (activeTab !== "leaders" && activeTab !== "beyond") return;
+      if (activeTab !== "leaders") return;
       if (!el.lightbox.classList.contains("hidden") && currentLightboxCard) {
         updateLightboxDetails(currentLightboxCard);
       }
@@ -253,7 +253,8 @@ async function loadCards() {
         if (target) activeTab = "court";
       } else {
         if (target.type === "Leader") {
-          activeTab = BEYOND_SET.has(normalizeName(target.name)) ? "beyond" : "leaders";
+          // Always show leader targets in the main leaders tab (previous 'beyond' leaders are included)
+          activeTab = "leaders";
         } else if (target.type === "Lore") {
           activeTab = "lore";
         }
@@ -624,7 +625,7 @@ function cardMatchesQuery(card, qLower, searchMode) {
 
 function updateSortControlVisibility() {
   if (!el.sortSelect) return;
-  const show = activeTab === "leaders" || activeTab === "beyond";
+  const show = activeTab === "leaders";
   el.sortSelect.style.display = show ? "" : "none";
   if (el.resourceSelect) el.resourceSelect.style.display = show ? "" : "none";
   if (el.setupSelect) el.setupSelect.style.display = show ? "" : "none";
@@ -697,13 +698,8 @@ function getLeaderBaseCardsForCounts() {
   let cards = allCards;
 
   if (activeTab === "leaders") {
-    cards = cards.filter(
-      (c) => c.type === "Leader" && !BEYOND_SET.has(normalizeName(c.name))
-    );
-  } else if (activeTab === "beyond") {
-    cards = cards.filter(
-      (c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name))
-    );
+    // Include all leaders for counts (previously 'beyond' leaders were separate)
+    cards = cards.filter((c) => c.type === "Leader");
   } else {
     return [];
   }
@@ -719,7 +715,7 @@ function getLeaderBaseCardsForCounts() {
 
 function updateResourceDropdownCounts() {
   if (!el.resourceSelect) return;
-  if (activeTab !== "leaders" && activeTab !== "beyond") return;
+  if (activeTab !== "leaders") return;
 
   // Counts should respect the other filter (setup), but not this resource filter.
   const baseCards = filterLeaderCardsBySetup(getLeaderBaseCardsForCounts(), getLeaderSetupFilter());
@@ -808,7 +804,7 @@ function formatSetupFootprintLabel(setupKey) {
 
 function updateSetupDropdownOptionsAndCounts() {
   if (!el.setupSelect) return;
-  if (activeTab !== "leaders" && activeTab !== "beyond") return;
+  if (activeTab !== "leaders") return;
 
   const selected = getLeaderSetupFilter();
 
@@ -859,17 +855,14 @@ function getFilteredCards({ ignoreDraft = false } = {}) {
 
   // Tab filter for non-court tabs
   if (activeTab === "leaders") {
-    // Regular leaders tab should NOT include the Beyond the Reach leader set
-    cards = cards.filter((c) => c.type === "Leader" && !BEYOND_SET.has(normalizeName(c.name)));
+    // Leaders tab now includes all leaders (including previously 'beyond' leaders)
+    cards = cards.filter((c) => c.type === "Leader");
   } else if (activeTab === "lore") {
     cards = cards.filter((c) => c.type === "Lore");
-  } else if (activeTab === "beyond") {
-    // Show only the specified leaders for the "Beyond the Reach" tab
-    cards = cards.filter((c) => c.type === "Leader" && BEYOND_SET.has(normalizeName(c.name)));
   }
 
   // Filters (leader tabs only)
-  if (activeTab === "leaders" || activeTab === "beyond") {
+  if (activeTab === "leaders") {
     cards = filterLeaderCardsByResource(cards, getLeaderResourceFilter());
     cards = filterLeaderCardsBySetup(cards, getLeaderSetupFilter());
   }
@@ -1393,7 +1386,7 @@ async function downloadImages() {
         leaders: "leaders.zip",
         lore: "lore.zip",
         all: "all_cards.zip",
-        beyond: "beyond-the-reach.zip",
+        
         court: "court_deck.zip",
       };
       return map[tab] || `${(tab || 'cards').replace(/\s+/g, '_')}.zip`;
@@ -1445,7 +1438,7 @@ function init() {
 
   // Read tab from URL if present and valid
   const initialUrlTab = getUrlTab();
-  const validTabs = ["leaders", "lore", "court", "all", "beyond"];
+  const validTabs = ["leaders", "lore", "court", "all"];
   if (initialUrlTab && validTabs.includes(initialUrlTab)) {
     activeTab = initialUrlTab;
     // update active class on tab buttons
