@@ -105,6 +105,7 @@ const el = {
   tabs: document.querySelectorAll(".tab"),
   sortSelect: document.getElementById("sortSelect"),
   resourceSelect: document.getElementById("resourceSelect"),
+  resourceSelectB: document.getElementById("resourceSelectB"),
   setupSelect: document.getElementById("setupSelect"),
   draftBtn: document.getElementById("draftBtn"),
   themeToggle: document.getElementById("themeToggle"),
@@ -551,7 +552,15 @@ function getLeaderSortMode() {
 }
 
 function getLeaderResourceFilter() {
-  return el.resourceSelect?.value || "any";
+  const aVal = el.resourceSelect?.value || "any";
+  const bVal = el.resourceSelectB?.value || "any";
+  // If the primary select encodes a combo like 'X|Y', prefer that.
+  if (typeof aVal === 'string' && aVal.includes('|')) return aVal;
+  // If primary select has a non-'any' value (including 'twoSame'), use it.
+  if (aVal && aVal !== 'any') return aVal;
+  // Otherwise, if secondary select is present and specifies something other than 'any', use pair form.
+  if (el.resourceSelectB && bVal && bVal !== 'any') return { a: aVal, b: bVal };
+  return aVal;
 }
 
 function getLeaderSetupFilter() {
@@ -595,19 +604,60 @@ function updateSortControlVisibility() {
   const show = activeTab === "leaders" || activeTab === "beyond";
   el.sortSelect.style.display = show ? "" : "none";
   if (el.resourceSelect) el.resourceSelect.style.display = show ? "" : "none";
+  if (el.resourceSelectB) el.resourceSelectB.style.display = show ? "" : "none";
   if (el.setupSelect) el.setupSelect.style.display = show ? "" : "none";
 }
 
-function filterLeaderCardsByResource(cards, resource) {
-  if (!resource || resource === "any") return cards;
+function filterLeaderCardsByResource(cards, resourceFilter) {
+  // Backwards-compatible single-string filter
+  if (!resourceFilter || resourceFilter === "any") return cards;
+  if (typeof resourceFilter === "string") {
+    const resource = resourceFilter;
+    // If value is a combo like 'Material|Fuel', handle as unordered pair
+    if (resource.includes("|")) {
+      const parts = resource.split("|").map(s => s || "none");
+      const a = parts[0] || "any";
+      const b = parts[1] || "any";
+      // Reuse object-style handling by falling through to the pair logic below
+      resourceFilter = { a, b };
+    } else {
+      return cards.filter((c) => {
+        if (c.type !== "Leader") return false;
+        const key = normalizeName(c.name);
+        if (resource === "twoSame") {
+          return leaderHasTwoSameResourceByName.get(key) === true;
+        }
+        const resources = leaderResourcesByName.get(key);
+        return resources ? resources.has(resource) : false;
+      });
+    }
+  }
+
+  // resourceFilter is {a,b}
+  const a = resourceFilter.a || "any";
+  const b = resourceFilter.b || "any";
+  if ((a === "any" || !a) && (b === "any" || !b)) return cards;
+
   return cards.filter((c) => {
     if (c.type !== "Leader") return false;
     const key = normalizeName(c.name);
-    if (resource === "twoSame") {
-      return leaderHasTwoSameResourceByName.get(key) === true;
+    const list = leaderResourceListByName.get(key) || [];
+    const slots = [list[0] || "none", list[1] || "none"];
+
+    // If one side is 'any' treat as single-match on the other side
+    if (a === "any") {
+      if (b === "none") return slots.includes("none");
+      return slots.includes(b);
     }
-    const resources = leaderResourcesByName.get(key);
-    return resources ? resources.has(resource) : false;
+    if (b === "any") {
+      if (a === "none") return slots.includes("none");
+      return slots.includes(a);
+    }
+
+    // Both specified: order-insensitive match (multiset equality)
+    const filterArr = [a, b].slice().sort();
+    const slotArr = slots.slice().sort();
+    return filterArr[0] === slotArr[0] && filterArr[1] === slotArr[1];
   });
 }
 
@@ -658,17 +708,19 @@ function updateResourceDropdownCounts() {
   if (anyOpt) anyOpt.textContent = `Has any (${total})`;
 
   const resourcesInOrder = ["Material", "Fuel", "Weapon", "Relic", "Psionic"];
-  for (const r of resourcesInOrder) {
-    const opt = el.resourceSelect.querySelector(`option[value="${r}"]`);
-    if (!opt) continue;
-    let count = 0;
-    for (const c of baseCards) {
-      const set = leaderResourcesByName.get(normalizeName(c.name));
-      if (set && set.has(r)) count++;
+
+  // Compute single counts for resources
+  const singleCounts = new Map();
+  for (const r of resourcesInOrder) singleCounts.set(r, 0);
+  for (const c of baseCards) {
+    const set = leaderResourcesByName.get(normalizeName(c.name));
+    if (!set) continue;
+    for (const r of resourcesInOrder) {
+      if (set.has(r)) singleCounts.set(r, (singleCounts.get(r) || 0) + 1);
     }
-    opt.textContent = `Has ${r} (${count})`;
   }
 
+  // twoSame count
   const twoSameOpt = el.resourceSelect.querySelector('option[value="twoSame"]');
   if (twoSameOpt) {
     let count = 0;
@@ -676,6 +728,62 @@ function updateResourceDropdownCounts() {
       if (leaderHasTwoSameResourceByName.get(normalizeName(c.name)) === true) count++;
     }
     twoSameOpt.textContent = `Has same (${count})`;
+  }
+
+  // Compute combination counts (unordered pairs), including 'none'
+  const comboElements = ["none", ...resourcesInOrder];
+  const comboCounts = new Map();
+  for (const c of baseCards) {
+    const list = leaderResourceListByName.get(normalizeName(c.name)) || [];
+    const s0 = list[0] || "none";
+    const s1 = list[1] || "none";
+    const key = [s0, s1].slice().sort().join("|");
+    comboCounts.set(key, (comboCounts.get(key) || 0) + 1);
+  }
+
+  // Build sorted singles list (only include >0) sorted by count desc
+  const singlesArr = [...singleCounts.entries()]
+    .filter(([r, cnt]) => cnt > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  // Build sorted combos list (only include >0), exclude pairs that are identical to single-only? keep all
+  const combosArr = [];
+  for (let i = 0; i < comboElements.length; i++) {
+    for (let j = i; j < comboElements.length; j++) {
+      const a = comboElements[i];
+      const b = comboElements[j];
+      const key = [a, b].slice().sort().join("|");
+      const count = comboCounts.get(key) || 0;
+      if (count > 0) combosArr.push({ a, b, key, count });
+    }
+  }
+  combosArr.sort((x, y) => y.count - x.count || String(x.key).localeCompare(y.key));
+
+  // Rebuild resourceSelect: Any, singles (sorted), twoSame (if exists), then combos (sorted)
+  const prev = el.resourceSelect.value;
+  const anyOptionHtml = `<option value="any">Has any (${total})</option>`;
+  const singlesHtml = singlesArr.map(([r, cnt]) => `<option value="${r}">Has ${r} (${cnt})</option>`).join("");
+  const twoSameHtml = twoSameOpt ? twoSameOpt.outerHTML : '';
+  const combosHtml = combosArr.map(({a, b, count}) => {
+    const labelA = a === 'none' ? 'None' : a;
+    const labelB = b === 'none' ? 'None' : b;
+    return `<option value="${a}|${b}">Has ${labelA} + ${labelB} (${count})</option>`;
+  }).join('');
+
+  el.resourceSelect.innerHTML = anyOptionHtml + singlesHtml + twoSameHtml + combosHtml;
+  const still = [...el.resourceSelect.options].some(o => o.value === prev);
+  el.resourceSelect.value = still ? prev : 'any';
+
+  // Mirror singles into secondary select (Any, None, singles sorted by count)
+  if (el.resourceSelectB) {
+    const selB = el.resourceSelectB.value;
+    const anyText = `Any (${total})`;
+    const anyHtml = `<option value="any">${anyText}</option>`;
+    const noneHtml = `<option value="none">None</option>`;
+    const resourcesHtml = singlesArr.map(([r, cnt]) => `<option value="${r}">${r} (${cnt})</option>`).join('');
+    el.resourceSelectB.innerHTML = anyHtml + noneHtml + resourcesHtml;
+    const stillExists = [...el.resourceSelectB.options].some((o) => o.value === selB);
+    el.resourceSelectB.value = stillExists ? selB : "any";
   }
 }
 
@@ -1345,6 +1453,11 @@ function init() {
   // Resource filter
   if (el.resourceSelect) {
     el.resourceSelect.addEventListener("change", () => {
+      render();
+    });
+  }
+  if (el.resourceSelectB) {
+    el.resourceSelectB.addEventListener("change", () => {
       render();
     });
   }
