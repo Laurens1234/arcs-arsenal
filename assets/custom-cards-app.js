@@ -2,7 +2,7 @@
 const REPO_OWNER = "Laurens1234";
 const REPO_NAME = "Arcs-Leader-Generator";
 const BRANCH = "main";
-const LEADERS_PATH = "results";
+const LEADERS_PATH = "results/leader";
 const LORE_PATH = "results/lore";
 const COURT_PATHS = ["results/guild", "results/vox"];
 
@@ -143,6 +143,7 @@ let leaderResourceListByName = new Map(); // key: normalizeName(leaderName) -> s
 let leaderHasTwoSameResourceByName = new Map(); // key: normalizeName(leaderName) -> boolean
 let leaderSetupFootprintByName = new Map(); // key: normalizeName(leaderName) -> string (e.g. "3-3-2|CS-")
 let leaderMetadataLoaded = false;
+let parsedLeadersList = [];
 
 // ========== Theme ==========
 function initTheme() {
@@ -177,72 +178,131 @@ function nameFromFile(filename, type) {
   return name.replace(/_/g, " ");
 }
 
+function filenameFromName(name, type) {
+  // Keep all letters, numbers, spaces, and underscores from the name; remove all other characters
+  let s = String(name || "").replace(/[^A-Za-z0-9_ ]/g, "");
+  if (type === "Lore") return `${s}_Lore_Card.png`;
+  if (type === "Guild") return `${s}_Guild_Card.png`;
+  if (type === "Vox") return `${s}_Vox_Card.png`;
+  return `${s}_Card.png`;
+}
+
+function generateFilenameCandidates(name, type) {
+  const out = [];
+  const suffix = type === "Lore" ? "_Lore_Card.png" : "_Card.png";
+  const raw = String(name || "").trim();
+
+  // candidate 1: preserve spaces, cleaned of odd punctuation
+  const keepSpaces = raw.replace(/[’‘]/g, "").replace(/[^A-Za-z0-9\s\-']/g, "").replace(/\s+/g, " ").trim();
+  out.push(`${keepSpaces}${suffix}`);
+
+  // candidate 2: remove underscores and spaces (join)
+  const joinNoUnderscore = raw.replace(/[_\s]+/g, "").replace(/[’‘]/g, "").replace(/[^A-Za-z0-9\-']/g, "");
+  if (joinNoUnderscore) out.push(`${joinNoUnderscore}${suffix}`);
+
+  // candidate 3: spaces -> underscores (older style)
+  const underscored = raw.replace(/[’‘]/g, "").replace(/[^A-Za-z0-9\s\-']/g, "").replace(/\s+/g, "_").trim();
+  if (underscored) out.push(`${underscored}${suffix}`);
+
+  // candidate 4: remove spaces only (join words)
+  const join = raw.replace(/\s+/g, "").replace(/[’‘]/g, "").replace(/[^A-Za-z0-9\-']/g, "");
+  if (join) out.push(`${join}${suffix}`);
+
+  // candidate 5/6: lowercase variants for the above join forms
+  if (joinNoUnderscore) out.push(`${joinNoUnderscore.toLowerCase()}${suffix}`);
+  if (join) out.push(`${join.toLowerCase()}${suffix}`);
+
+  // de-dupe while preserving order
+  return [...new Set(out)];
+}
+
+async function findExistingImageUrl(folderPath, name, type) {
+  const filename = filenameFromName(name, type);
+  const url = `${RAW_BASE}/${folderPath}/${encodeURIComponent(filename)}`;
+  return { url, filename };
+}
+
 async function loadCards() {
   el.status.textContent = "Loading cards from GitHub…";
 
   try {
-    // Load leader ordering metadata in the background; don't block image list.
-    loadLeaderMetadata().then(() => {
-      // Counts for the resource dropdown also depend on this metadata.
-      if (activeTab !== "leaders") return;
-      if (!el.lightbox.classList.contains("hidden") && currentLightboxCard) {
-        updateLightboxDetails(currentLightboxCard);
-      }
-      render();
+    // Load leader metadata (parsed from raw YAML) and YAML manifests for lore/guild/vox.
+    const parsedLeaders = await loadLeaderMetadata();
+    const parsedLore = await loadYamlListFor('lore');
+    const parsedGuild = await loadYamlListFor('guild');
+    const parsedVox = await loadYamlListFor('vox');
+
+    // Update lightbox/details now that metadata is available
+    if (activeTab === "leaders" && !el.lightbox.classList.contains("hidden") && currentLightboxCard) {
+      updateLightboxDetails(currentLightboxCard);
+    }
+
+    // Build leader list from parsed YAML only (no API fallback)
+    const leaderPromises = (Array.isArray(parsedLeaders) ? parsedLeaders : []).map(async (p) => {
+      const found = await findExistingImageUrl(LEADERS_PATH, p.name, "Leader");
+      return {
+        name: p.name,
+        type: "Leader",
+        filename: found.filename,
+        imageUrl: found.url,
+      };
+    });
+    const leaders = await Promise.all(leaderPromises);
+
+    // Build lore list from parsed YAML only (resolve existing filename variants)
+    const lorePromises = (Array.isArray(parsedLore) ? parsedLore : []).map(async (p) => {
+      const found = await findExistingImageUrl(LORE_PATH, p.name, "Lore");
+      return {
+        name: p.name,
+        type: "Lore",
+        filename: found.filename,
+        imageUrl: found.url,
+      };
+    });
+    const lore = await Promise.all(lorePromises);
+
+
+    // Build court deck (guild + vox) from raw YAML manifests only
+    const guildPromises = (Array.isArray(parsedGuild) ? parsedGuild : []).map(async (p) => {
+      const found = await findExistingImageUrl(COURT_PATHS[0], p.name, "Guild");
+      return {
+        name: p.name,
+        type: "Guild",
+        filename: found.filename,
+        imageUrl: found.url,
+      };
     });
 
-    const [leaderFiles, loreFiles, guildFiles, voxFiles] = await Promise.all([
-      fetchGitHubDir(LEADERS_PATH),
-      fetchGitHubDir(LORE_PATH),
-      fetchGitHubDir(COURT_PATHS[0]),
-      fetchGitHubDir(COURT_PATHS[1]),
-    ]);
+    const voxPromises = (Array.isArray(parsedVox) ? parsedVox : []).map(async (p) => {
+      const found = await findExistingImageUrl(COURT_PATHS[1], p.name, "Vox");
+      return {
+        name: p.name,
+        type: "Vox",
+        filename: found.filename,
+        imageUrl: found.url,
+      };
+    });
 
-    const leaders = leaderFiles
-      .filter((f) => f.type === "file" && f.name.toLowerCase().endsWith(".png"))
-      .map((f) => ({
-        name: nameFromFile(f.name, "Leader"),
-        type: "Leader",
-        filename: f.name,
-        imageUrl: `${RAW_BASE}/${LEADERS_PATH}/${encodeURIComponent(f.name)}`,
-      }));
-
-    const lore = loreFiles
-      .filter((f) => f.type === "file" && f.name.toLowerCase().endsWith(".png"))
-      .map((f) => ({
-        name: nameFromFile(f.name, "Lore"),
-        type: "Lore",
-        filename: f.name,
-        imageUrl: `${RAW_BASE}/${LORE_PATH}/${encodeURIComponent(f.name)}`,
-      }));
-
-    allCards = [...leaders, ...lore].sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
-
-    // Build court deck (guild + vox)
-    const guild = Array.isArray(guildFiles) ? guildFiles
-      .filter((f) => f.type === "file" && f.name.toLowerCase().endsWith(".png"))
-      .map((f) => ({
-        name: nameFromFile(f.name, "Leader"),
-        type: "Leader",
-        filename: f.name,
-        imageUrl: `${RAW_BASE}/${COURT_PATHS[0]}/${encodeURIComponent(f.name)}`,
-      })) : [];
-
-    const vox = Array.isArray(voxFiles) ? voxFiles
-      .filter((f) => f.type === "file" && f.name.toLowerCase().endsWith(".png"))
-      .map((f) => ({
-        name: nameFromFile(f.name, "Leader"),
-        type: "Leader",
-        filename: f.name,
-        imageUrl: `${RAW_BASE}/${COURT_PATHS[1]}/${encodeURIComponent(f.name)}`,
-      })) : [];
+    const guild = await Promise.all(guildPromises);
+    const vox = await Promise.all(voxPromises);
 
     courtCards = [...guild, ...vox].sort((a, b) => a.name.localeCompare(b.name));
 
-    // Ensure the "All" tab includes court deck cards (guild + vox)
-    allCards = [...leaders, ...lore, ...guild, ...vox].sort((a, b) => a.name.localeCompare(b.name));
+    // The leaders tab should only include true leaders (not guild/vox)
+    // Sort leaders by their order in leaders.yml, not alphabetically
+    // Find the order for each leader using leaderOrderByName (set after loadLeaderMetadata)
+    // For lore, keep alphabetical order after leaders
+    function leaderOrderSort(a, b) {
+      const aOrder = leaderOrderByName.get(normalizeName(a.name));
+      const bOrder = leaderOrderByName.get(normalizeName(b.name));
+      if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder;
+      if (aOrder !== undefined) return -1;
+      if (bOrder !== undefined) return 1;
+      return a.name.localeCompare(b.name);
+    }
+    const sortedLeaders = [...leaders].sort(leaderOrderSort);
+    const sortedLore = [...lore].sort((a, b) => a.name.localeCompare(b.name));
+    allCards = [...sortedLeaders, ...sortedLore];
 
     el.status.textContent = "";
     render();
@@ -402,135 +462,160 @@ function computeAbilityCharCount(abilitiesCombinedText) {
   return total;
 }
 
+// Parse a simple YAML list of card objects (used for leaders, lore, guild, vox)
+function parseYamlList(yaml) {
+  if (!yaml) return [];
+  // Ensure splitting works for items at start of file
+  const text = yaml.startsWith('\n') ? yaml : '\n' + yaml;
+  const blocks = text.split(/\n-(?=\s*(?:name|image_name):)/g);
+  const items = [];
+
+  for (let i = 0; i < blocks.length; i++) {
+    let block = blocks[i];
+    if (!block || !block.trim()) continue;
+    // Remove any leading '-' or whitespace
+    block = block.replace(/^\s*-\s*/, '');
+
+    // Name
+    const nameMatch = block.match(/name:\s*"?([^\n"]+)"?/m);
+    if (!nameMatch) continue;
+    const name = nameMatch[1].trim();
+    const key = normalizeName(name);
+
+    // Abilities: block scalar (|), quoted multi-line, or inline
+    let abilities = '';
+    const abilitiesBlockMatch = block.match(/abilities:\s*\|[\r\n]+((?:\s{2,}.*[\r\n]*)*)(?=(?:\n\s{2}[A-Za-z0-9_-]+:)|\n*$)/m);
+    if (abilitiesBlockMatch) {
+      // strip common indent (at least 2 spaces)
+      abilities = abilitiesBlockMatch[1].split(/\r?\n/).map(l => l.replace(/^\s{2}/, '')).join('\n').replace(/\r/g, '').trim();
+    } else {
+      const abilitiesQuotedMatch = block.match(/abilities:\s*(['"])([\s\S]*?)\1(?=(?:\n\s{2}[A-Za-z0-9_-]+:)|\n*$)/m);
+      if (abilitiesQuotedMatch) {
+        abilities = abilitiesQuotedMatch[2].replace(/\r/g, '').trim();
+      } else {
+        const abilitiesInlineMatch = block.match(/abilities:\s*([^\n\r]+)/m);
+        if (abilitiesInlineMatch) abilities = abilitiesInlineMatch[1].replace(/\r/g, '').trim();
+      }
+    }
+
+    // Resources: either a YAML list or inline array
+    let resources = [];
+    const resourcesListMatch = block.match(/resources:\s*\n((?:\s*-\s*[^\n]+\n?)*)/m);
+    if (resourcesListMatch && resourcesListMatch[1]) {
+      const lines = resourcesListMatch[1].split(/\r?\n/);
+      for (const ln of lines) {
+        const m = ln.match(/-\s*(.*)/);
+        if (m && m[1]) resources.push(stripMarkdownForCharCount(m[1].trim().replace(/['"]/g, '')));
+      }
+    } else {
+      const resourcesInlineMatch = block.match(/resources:\s*\[([^\]]*)\]/m);
+      if (resourcesInlineMatch && resourcesInlineMatch[1]) {
+        resources = resourcesInlineMatch[1].split(',').map(s => stripMarkdownForCharCount(s.replace(/['"]/g, '').trim())).filter(Boolean);
+      }
+    }
+
+    // Setup
+    let setupKey = '';
+    const setupMatch = block.match(/setup:\s*\n([\s\S]*?)(?=(?:\n\s{2}[A-Za-z0-9_-]+:)|\n*$)/m);
+    if (setupMatch) {
+      const setupText = setupMatch[1];
+      function readSlot(slot) {
+        const slotRe = new RegExp(`${slot}:\\s*\\n\\s*ships:\s*(\\d+)\\s*\\n\\s*building:\s*['\"]?([^'\"\\n]+)['\"]?`, 'm');
+        const m = setupText.match(slotRe);
+        if (!m) return null;
+        const ships = parseInt(m[1], 10);
+        const buildingRaw = stripMarkdownForCharCount(m[2]);
+        const building = (buildingRaw || '').toLowerCase();
+        return { ships: Number.isFinite(ships) ? ships : 0, building };
+      }
+      const a = readSlot('A');
+      const b = readSlot('B');
+      const c = readSlot('C');
+      if (a && b && c) {
+        const shipsPattern = `${a.ships}-${b.ships}-${c.ships}`;
+        function bldChar(bld) {
+          if (bld === 'city') return 'C';
+          if (bld === 'starport') return 'S';
+          return '-';
+        }
+        const buildingsPattern3 = `${bldChar(a.building)}${bldChar(b.building)}${bldChar(c.building)}`;
+        const buildingsPattern = buildingsPattern3.endsWith('-') ? buildingsPattern3.slice(0, -1) : buildingsPattern3;
+        setupKey = `${shipsPattern}|${buildingsPattern}`;
+      }
+    }
+
+    // Capture other top-level scalar fields (title, body, variant, footer, etc.)
+    const extra = {};
+    // Find keys at top-level (lines indented 2 spaces)
+    const keyRe = /^\s{2}([A-Za-z0-9_-]+):/gm;
+    let km;
+    const keys = new Set();
+    while ((km = keyRe.exec(block)) !== null) {
+      keys.add(km[1]);
+    }
+
+    for (const k of keys) {
+      if (k === 'name' || k === 'abilities' || k === 'resources' || k === 'setup') continue;
+
+      // block scalar
+      const blockScalarRe = new RegExp(`${k}:\\s*\\|[\\r\\n]+((?:\\s{2,}.*[\\r\\n]*)*)(?=(?:\\n\\s{2}[A-Za-z0-9_-]+:)|\\n*$)`, 'm');
+      const bs = block.match(blockScalarRe);
+      if (bs) {
+        extra[k] = bs[1].split(/\\r?\\n/).map(l => l.replace(/^\\s{2}/, '')).join('\n').replace(/\\r/g, '').trim();
+        continue;
+      }
+
+      // quoted multi-line or single-line
+      const quotedRe = new RegExp(`${k}:\\s*(['\"])([\\s\\S]*?)\\1(?=(?:\\n\\s{2}[A-Za-z0-9_-]+:)|\\n*$)`, 'm');
+      const q = block.match(quotedRe);
+      if (q) {
+        extra[k] = q[2].replace(/\\r/g, '').trim();
+        continue;
+      }
+
+      // inline scalar
+      const inlineRe = new RegExp(`${k}:\\s*([^\\n\\r]+)`, 'm');
+      const im = block.match(inlineRe);
+      if (im) {
+        extra[k] = im[1].trim();
+      }
+    }
+
+    items.push(Object.assign({ name, key, abilities, resources, setupKey }, extra));
+  }
+
+  return items;
+}
+
+// Fetch a scripts/data/*.yml file from raw.githubusercontent if present
+async function fetchScriptsDataYaml(name) {
+  const url = `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/${BRANCH}/scripts/data/${name}.yml`;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return "";
+    return await res.text();
+  } catch (e) {
+    return "";
+  }
+}
+
+async function loadYamlListFor(name) {
+  const text = await fetchScriptsDataYaml(name);
+  if (!text) return [];
+  return parseYamlList(text);
+}
+
 async function loadLeaderMetadata() {
-  const urls = {
-    leaders: `${RAW_BASE}/scripts/leadersFormatted.py`,
-    btr: `${RAW_BASE}/scripts/btrFormatted.py`,
-  };
+  // Fetch YAML data from scripts/data/leaders.yml on raw.githubusercontent
+  const yamlText = await fetchScriptsDataYaml('leaders');
 
-  async function safeFetchText(url) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return "";
-      return await res.text();
-    } catch (e) {
-      return "";
-    }
-  }
+      let resources = [];
+  const allLeaders = parseYamlList(yamlText);
+  parsedLeadersList = allLeaders;
 
-  function parseInto(text, opts) {
-    const {
-      includeKey = () => true,
-      overwrite = false,
-      writeOrder = false,
-      orderCounter = { value: 1 },
-      orderMap,
-      abilityCharsMap,
-      abilityTextMap,
-      resourcesMap,
-      resourceListMap,
-      twoSameMap,
-      setupMap,
-    } = opts;
-
-    if (!text) return;
-
-    const nameRe = /"name"\s*:\s*"([^"]+)"/g;
-    const nameMatches = [];
-    let match;
-    while ((match = nameRe.exec(text))) {
-      const name = match[1];
-      const key = normalizeName(name);
-      if (!key) continue;
-      if (!includeKey(key)) continue;
-      if (writeOrder && !orderMap.has(key)) {
-        orderMap.set(key, orderCounter.value++);
-      }
-      nameMatches.push({ name, key, index: match.index });
-    }
-
-    for (let i = 0; i < nameMatches.length; i++) {
-      const { key, index } = nameMatches[i];
-      const nextIndex = i + 1 < nameMatches.length ? nameMatches[i + 1].index : text.length;
-      const slice = text.slice(index, nextIndex);
-
-      // abilities
-      if (overwrite || !abilityCharsMap.has(key) || !abilityTextMap.has(key)) {
-        const abilitiesKeyIndex = slice.search(/"abilities"\s*:\s*\(/);
-        if (abilitiesKeyIndex !== -1) {
-          const openParenIndex = slice.indexOf("(", abilitiesKeyIndex);
-          if (openParenIndex !== -1) {
-            const closeParenIndex = findMatchingParen(slice, openParenIndex);
-            if (closeParenIndex !== -1) {
-              const inside = slice.slice(openParenIndex + 1, closeParenIndex);
-              const pieces = extractDoubleQuotedStrings(inside);
-              if (pieces.length) {
-                const combined = pieces.join("");
-                abilityTextMap.set(key, combined);
-                abilityCharsMap.set(key, computeAbilityCharCount(combined));
-              }
-            }
-          }
-        }
-      }
-
-      // resources
-      if (overwrite || !resourcesMap.has(key) || !resourceListMap.has(key)) {
-        const resMatch = slice.match(/"resources"\s*:\s*\[([^\]]*)\]/);
-        if (resMatch && resMatch[1] !== undefined) {
-          const items = extractDoubleQuotedStrings(resMatch[1]);
-          const cleaned = items.map((s) => stripMarkdownForCharCount(s)).filter(Boolean);
-          const set = new Set(cleaned);
-          if (set.size) {
-            resourcesMap.set(key, set);
-            resourceListMap.set(key, cleaned);
-          }
-          if (cleaned.length >= 2) {
-            twoSameMap.set(key, cleaned[0] === cleaned[1]);
-          }
-        }
-      }
-
-      // setup footprint
-      if (overwrite || !setupMap.has(key)) {
-        const setupMatch = slice.match(/"setup"\s*:\s*\{([\s\S]*?)\}\s*,?\s*(?:"body_font_size"|\}|$)/);
-        const setupText = setupMatch ? setupMatch[1] : "";
-        if (setupText) {
-          function readSlot(slot) {
-            const slotRe = new RegExp(`"${slot}"\\s*:\\s*\\{[\\s\\S]*?"ships"\\s*:\\s*(\\d+)[\\s\\S]*?"building"\\s*:\\s*"([^\"]+)"`, "m");
-            const m = setupText.match(slotRe);
-            if (!m) return null;
-            const ships = parseInt(m[1], 10);
-            const buildingRaw = stripMarkdownForCharCount(m[2]);
-            const building = (buildingRaw || "").toLowerCase();
-            return { ships: Number.isFinite(ships) ? ships : 0, building };
-          }
-
-          const a = readSlot("A");
-          const b = readSlot("B");
-          const c = readSlot("C");
-          if (a && b && c) {
-            const shipsPattern = `${a.ships}-${b.ships}-${c.ships}`;
-            function bldChar(bld) {
-              if (bld === "city") return "C";
-              if (bld === "starport") return "S";
-              return "-";
-            }
-            const buildingsPattern3 = `${bldChar(a.building)}${bldChar(b.building)}${bldChar(c.building)}`;
-            const buildingsPattern = buildingsPattern3.endsWith("-")
-              ? buildingsPattern3.slice(0, -1)
-              : buildingsPattern3;
-            setupMap.set(key, `${shipsPattern}|${buildingsPattern}`);
-          }
-        }
-      }
-    }
-  }
-
-  const [leadersText, btrText] = await Promise.all([
-    safeFetchText(urls.leaders),
-    safeFetchText(urls.btr),
-  ]);
+  // Partition into regular and beyond
+  const regularLeaders = allLeaders.filter(l => !BEYOND_SET.has(l.key));
+  const beyondLeaders = allLeaders.filter(l => BEYOND_SET.has(l.key));
 
   const nextOrderMap = new Map();
   const nextAbilityMap = new Map();
@@ -539,37 +624,39 @@ async function loadLeaderMetadata() {
   const nextResourceListMap = new Map();
   const nextTwoSameMap = new Map();
   const nextSetupMap = new Map();
-  const orderCounter = { value: 1 };
+  let orderCounter = 1;
 
-  // Regular leaders use leadersFormatted.py
-  parseInto(leadersText, {
-    includeKey: (k) => !BEYOND_SET.has(k),
-    overwrite: false,
-    writeOrder: true,
-    orderCounter,
-    orderMap: nextOrderMap,
-    abilityCharsMap: nextAbilityMap,
-    abilityTextMap: nextAbilityTextMap,
-    resourcesMap: nextResourcesMap,
-    resourceListMap: nextResourceListMap,
-    twoSameMap: nextTwoSameMap,
-    setupMap: nextSetupMap,
-  });
+  // Regular leaders
+  for (const l of regularLeaders) {
+    nextOrderMap.set(l.key, orderCounter++);
+    nextAbilityTextMap.set(l.key, l.abilities);
+    nextAbilityMap.set(l.key, computeAbilityCharCount(l.abilities));
+    const set = new Set(l.resources);
+    nextResourcesMap.set(l.key, set);
+    nextResourceListMap.set(l.key, l.resources);
+    if (l.resources.length >= 2) {
+      nextTwoSameMap.set(l.key, l.resources[0] === l.resources[1]);
+    }
+    if (l.setupKey) {
+      nextSetupMap.set(l.key, l.setupKey);
+    }
+  }
 
-  // Beyond the Reach leaders use btrFormatted.py
-  parseInto(btrText, {
-    includeKey: (k) => BEYOND_SET.has(k),
-    overwrite: true,
-    writeOrder: false,
-    orderCounter,
-    orderMap: nextOrderMap,
-    abilityCharsMap: nextAbilityMap,
-    abilityTextMap: nextAbilityTextMap,
-    resourcesMap: nextResourcesMap,
-    resourceListMap: nextResourceListMap,
-    twoSameMap: nextTwoSameMap,
-    setupMap: nextSetupMap,
-  });
+  // Beyond the Reach leaders
+  for (const l of beyondLeaders) {
+    // Beyond leaders do not get an order number
+    nextAbilityTextMap.set(l.key, l.abilities);
+    nextAbilityMap.set(l.key, computeAbilityCharCount(l.abilities));
+    const set = new Set(l.resources);
+    nextResourcesMap.set(l.key, set);
+    nextResourceListMap.set(l.key, l.resources);
+    if (l.resources.length >= 2) {
+      nextTwoSameMap.set(l.key, l.resources[0] === l.resources[1]);
+    }
+    if (l.setupKey) {
+      nextSetupMap.set(l.key, l.setupKey);
+    }
+  }
 
   leaderOrderByName = nextOrderMap;
   leaderAbilityCharsByName = nextAbilityMap;
@@ -579,6 +666,7 @@ async function loadLeaderMetadata() {
   leaderHasTwoSameResourceByName = nextTwoSameMap;
   leaderSetupFootprintByName = nextSetupMap;
   leaderMetadataLoaded = true;
+  return parsedLeadersList;
 }
 
 function getLeaderSortMode() {
@@ -1172,7 +1260,7 @@ function printCards() {
   const PAGE_CONTENT_WIDTH_MM = 186;
   const PAGE_CONTENT_HEIGHT_MM = 263;
 
-  const backImageUrl = "https://raw.githubusercontent.com/Laurens1234/Arcs-Leader-Generator/refs/heads/main/cardAssets/CardAssets-Tarot-Leader-No-Bleed.png";
+  const backImageUrl = `${RAW_BASE}/cardAssets/CardAssets-Tarot-Leader-No-Bleed.png`;
 
   const widthMmForCard = (card) => (card.type === "Lore" ? 63 : 70);
   const heightMmForCard = (card) => (card.type === "Lore" ? 88 : 120);
@@ -1373,7 +1461,7 @@ async function downloadImages() {
       try {
         const res = await fetch(card.imageUrl);
         const blob = await res.blob();
-        const filename = card.filename || `${card.name.replace(/\s+/g, "_")}.png`;
+        const filename = card.filename || filenameFromName(card.name, card.type || 'Leader');
         folder.file(filename, blob);
       } catch (err) {
         console.error("Failed to fetch", card.imageUrl, err);
