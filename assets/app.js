@@ -1264,6 +1264,55 @@ function wireDataSourceToggle() {
   });
 }
 
+// ========== Pretty URLs (hide .html) ==========
+function initPrettyUrls() {
+  try {
+    // If the current URL ends with .html (or /index.html), replace it with a prettier path
+    const pathname = window.location.pathname || "";
+    if (/\/index\.html$/.test(pathname)) {
+      const pretty = pathname.replace(/\/index\.html$/, "/") || "/";
+      history.replaceState(null, "", pretty + window.location.search + window.location.hash);
+    } else if (pathname.endsWith('.html')) {
+      const pretty = pathname.replace(/\.html$/, '');
+      history.replaceState(null, "", pretty + window.location.search + window.location.hash);
+    }
+
+    // Rewrite same-origin links so they appear without .html but still navigate to the real .html file.
+    document.querySelectorAll('a[href]').forEach((a) => {
+      const orig = a.getAttribute('href');
+      if (!orig) return;
+      // Ignore anchors and mailto/tel
+      if (orig.startsWith('#') || orig.startsWith('mailto:') || orig.startsWith('tel:')) return;
+      let url;
+      try {
+        url = new URL(orig, window.location.href);
+      } catch (e) {
+        return;
+      }
+      if (url.origin !== window.location.origin) return; // external
+      const p = url.pathname || '';
+      if (p.endsWith('.html')) {
+        // Build pretty href (turn /foo/index.html -> /foo/ ; /bar.html -> /bar)
+        const prettyPath = p.replace(/\/index\.html$/, '/').replace(/\.html$/, '');
+        const prettyHref = prettyPath + (url.search || '') + (url.hash || '');
+        a.dataset.htmlHref = orig; // keep original target
+        a.setAttribute('href', prettyHref);
+
+        // Intercept clicks to actually navigate to the real .html so servers that expect .html still respond.
+        a.addEventListener('click', (e) => {
+          // Allow modifier keys / non-left clicks to behave normally
+          if (e.defaultPrevented) return;
+          if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          window.location.href = a.dataset.htmlHref;
+        });
+      }
+    });
+  } catch (err) {
+    console.error('initPrettyUrls failed', err);
+  }
+}
+
 // ========== Main ==========
 async function main() {
   initTheme();
@@ -1320,4 +1369,6 @@ async function main() {
   }
 }
 
+// Initialize pretty URLs (hide .html in address bar and rewrite same-origin links)
+initPrettyUrls();
 main();
