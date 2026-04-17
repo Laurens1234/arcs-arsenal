@@ -229,6 +229,12 @@
             <button id="rollDiceBtn" class="btn-roll">🎲 Roll Dice</button>
           </div>
           <div id="bellCurvesSection"></div>
+          <!-- Roll history panel (rendered by assets/dice-app.js) -->
+          <div id="rollHistoryPanel" style="margin-top:12px;">
+            <h3 style="margin:6px 0 8px;font-size:1rem">Roll History</h3>
+            <div id="rollHistory" style="background:var(--panel-bg);padding:6px;border-radius:6px;max-height:220px;overflow:auto"></div>
+            <div style="margin-top:6px;text-align:right;"><button id="clearHistoryBtn" class="btn-secondary" style="padding:6px 10px">Clear History</button></div>
+          </div>
         </div>
       </div>
     </main>

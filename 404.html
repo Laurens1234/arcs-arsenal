@@ -1,4 +1,52 @@
 <!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Not found — attempting graceful fallback</title>
+<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;padding:2rem;color:var(--fg,#111)}a{color:blue}</style>
+<script>
+  // On GitHub Pages (and other static hosts) a direct visit to /page will 404.
+  // This 404.html attempts to fetch /page.html or /page/index.html and
+  // if found, injects that HTML so the pretty URL works while preserving
+  // the address bar.
+  (async function(){
+    try{
+      const p = window.location.pathname || '/';
+      // Don't try for root or already-HTML paths
+      if(p === '/' || p.endsWith('.html')) return;
+
+      const tryCandidates = [];
+      // /foo -> /foo.html and /foo/index.html
+      if(p.endsWith('/')){
+        tryCandidates.push(p + 'index.html');
+      } else {
+        tryCandidates.push(p + '.html');
+        tryCandidates.push(p + '/index.html');
+      }
+
+      for(const candidate of tryCandidates){
+        try{
+          const res = await fetch(candidate, {cache: 'no-store'});
+          if(res.ok){
+            const text = await res.text();
+            // Replace current document with fetched HTML while keeping URL
+            document.open();
+            document.write(text);
+            document.close();
+            return;
+          }
+        }catch(e){
+          // ignore and try next
+        }
+      }
+    }catch(e){
+      console.error('404 fallback error', e);
+    }
+    // If we get here, show a minimal helpful 404 message.
+    document.title = 'Page not found';
+    document.body.innerHTML = '<h1>Page not found</h1><p>The requested page could not be found.</p><p><a href="/">Return home</a></p>';
+  })();
+</script>
+<!doctype html>
 <html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
