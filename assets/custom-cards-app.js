@@ -117,6 +117,7 @@ const el = {
   lightboxMeta: document.getElementById("lightboxMeta"),
   lightboxAbilities: document.getElementById("lightboxAbilities"),
   lightboxBackdrop: document.querySelector(".lightbox-backdrop"),
+  paperSizeSelect: document.getElementById("paperSizeSelect"),
 };
 
 // ========== State ==========
@@ -1295,6 +1296,62 @@ function printCards() {
   const container = document.getElementById("printContainer");
   container.innerHTML = "";
 
+  // Ensure @page size matches user preference (A4, letter, etc.).
+  // Preference order: DOM select (`paperSizeSelect`) -> localStorage -> prompt fallback.
+  function getPreferredPaperSize() {
+    try {
+      const sel = el.paperSizeSelect || document.getElementById("paperSizeSelect");
+      const saved = localStorage.getItem("arcs-print-paper");
+      if (sel && sel.value) {
+        const v = String(sel.value).trim();
+        localStorage.setItem('arcs-print-paper', v);
+        return v;
+      }
+      if (saved) return saved;
+      return 'A4';
+    } catch (e) {
+      return 'A4';
+    }
+  }
+
+  function ensurePrintPageSizeCss(size) {
+    try {
+      if (!size) return null;
+      let pageVal = null;
+        if (typeof size === 'string') {
+          const norm = String(size).toLowerCase();
+          if (norm === "letter" || norm === "us-letter" || norm === "usletter") pageVal = "letter";
+          else pageVal = "A4"; // default
+        }
+        if (!pageVal) return null;
+      // Create or update style tag
+      let s = document.getElementById("arcs-print-page-style");
+      const css = `@page { size: ${pageVal}; margin: 10mm 8mm 8mm 8mm; }`;
+      if (!s) {
+        s = document.createElement("style");
+        s.id = "arcs-print-page-style";
+        s.type = "text/css";
+        s.appendChild(document.createTextNode(css));
+        document.head.appendChild(s);
+      } else {
+        // replace content
+        s.textContent = css;
+      }
+      return s;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function removePrintPageSizeCss() {
+    try {
+      const s = document.getElementById("arcs-print-page-style");
+      if (s && s.parentNode) s.parentNode.removeChild(s);
+    } catch (e) {
+      // ignore
+    }
+  }
+
   // Layout math for printing (must stay consistent with @page in CSS)
   // A4 = 210×297mm.
   // CSS uses @page margin: 10mm top, 8mm left/right/bottom → content area = 194×279mm.
@@ -1482,8 +1539,21 @@ function printCards() {
     }));
   }
 
+  // Inject @page rule for preferred paper size and remove it after printing.
+  const pref = getPreferredPaperSize();
+  ensurePrintPageSizeCss(pref);
+
+  function cleanupAfterPrint() {
+    removePrintPageSizeCss();
+    try { window.removeEventListener('afterprint', cleanupAfterPrint); } catch (e) {}
+  }
+  window.addEventListener('afterprint', cleanupAfterPrint);
+
   Promise.all(promises).then(() => {
+    // Trigger print after styles are in place
     window.print();
+    // As a fallback, schedule cleanup in case `afterprint` doesn't fire.
+    setTimeout(cleanupAfterPrint, 3000);
   });
 }
 
@@ -1546,6 +1616,14 @@ function init() {
 
   // Print
   document.getElementById("printBtn").addEventListener("click", printCards);
+  // Paper size UI handling
+  if (el.paperSizeSelect) {
+    const saved = localStorage.getItem('arcs-print-paper');
+    if (saved) el.paperSizeSelect.value = saved;
+    el.paperSizeSelect.addEventListener('change', () => {
+      localStorage.setItem('arcs-print-paper', el.paperSizeSelect.value);
+    });
+  }
   // Download
   const downloadBtn = document.getElementById("downloadBtn");
   if (downloadBtn) downloadBtn.addEventListener("click", downloadImages);
