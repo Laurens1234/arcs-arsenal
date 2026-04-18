@@ -1293,6 +1293,26 @@ function printCards() {
     : visible;
   if (cards.length === 0) return;
 
+  // If fewer than 4 cards will be printed, pad with white placeholder cards
+  // so the sheet layout looks consistent. Placeholders are marked with
+  // `_isPlaceholder` and will not be counted as leaders for back pages.
+  if (cards.length > 0 && cards.length < 4) {
+    const firstType = cards[0].type || 'Leader';
+    const placeholders = [];
+    const whiteSvg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 150"><rect width="100%" height="100%" fill="white"/></svg>');
+    const whiteUrl = `data:image/svg+xml;utf8,${whiteSvg}`;
+    for (let i = 0; i < 4 - cards.length; i++) {
+      placeholders.push({
+        name: '',
+        type: firstType,
+        filename: 'blank.png',
+        imageUrl: whiteUrl,
+        _isPlaceholder: true,
+      });
+    }
+    cards.push(...placeholders);
+  }
+
   const container = document.getElementById("printContainer");
   container.innerHTML = "";
 
@@ -1365,6 +1385,8 @@ function printCards() {
 
   const widthMmForCard = (card) => (card.type === "Lore" ? 63 : 70);
   const heightMmForCard = (card) => (card.type === "Lore" ? 88 : 120);
+
+  // No special single-card scaling: cards render using the standard sizes.
 
   function buildRows(cardList) {
     /** @type {Array<Array<any>>} */
@@ -1447,6 +1469,14 @@ function printCards() {
             isLastRowOfPage ? "cut-bottom" : "",
           ].filter(Boolean).join(" ");
 
+          // If a card has explicit print dimensions (mm), apply them inline
+          // to override the default CSS sizes. This is used when printing a
+          // single card so it fills the content area.
+          if (card._printWidthMm && card._printHeightMm) {
+            div.style.width = `${card._printWidthMm}mm`;
+            div.style.height = `${card._printHeightMm}mm`;
+          }
+
           // Crop marks: extend cut lines slightly into page margins.
           // These are only meaningful on the outer page perimeter.
           function addMark(className) {
@@ -1503,7 +1533,7 @@ function printCards() {
   // 1) Render fronts
   const frontRows = buildRows(cards);
   const frontPages = paginateRows(frontRows);
-  const leaderCount = cards.filter((c) => c.type !== "Lore").length;
+  const leaderCount = cards.filter((c) => c.type !== "Lore" && !c._isPlaceholder).length;
 
   /** @type {Array<Array<Array<any>>>} */
   let backPages = [];
